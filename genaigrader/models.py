@@ -117,6 +117,7 @@ class Evaluation(models.Model):
     time = models.FloatField()
     model = models.ForeignKey(Model, on_delete= models.CASCADE)
     exam = models.ForeignKey(Exam, on_delete=models.CASCADE)
+    ollama_version = models.CharField(max_length=50, null=True, blank=True, help_text="Version of Ollama used (null for external models)")
 
     def __str__(self):
         return f'{self.prompt} {self.grade}'

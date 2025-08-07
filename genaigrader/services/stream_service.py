@@ -5,6 +5,7 @@ from django.db import transaction
 from django.utils import timezone
 from genaigrader.models import Evaluation, QuestionEvaluation
 from genaigrader.services.llm_service import generate_prompt
+from genaigrader.services.ollama_version_service import get_evaluation_ollama_version
 
 # Set logging level to INFO
 logging.basicConfig(level=logging.INFO)
@@ -37,7 +38,8 @@ def stream_responses(questions, user_prompt, llm, total_questions, exam):
         grade=0,
         model=llm.model_obj, 
         exam=exam,
-        time=0.0
+        time=0.0,
+        ollama_version=get_evaluation_ollama_version(llm.model_obj)
     )
 
     for index, question in enumerate(questions):
