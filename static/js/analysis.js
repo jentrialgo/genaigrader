@@ -15,7 +15,7 @@ document.addEventListener('DOMContentLoaded', function () {
      */
     const createErrorBarChart = (canvas, rawData, field, title, colorRGB, decimals = 2, yRange) => {
         const labels = rawData.map(d => d.model__description);
-        const data = rawData.map(item => ({ x: item.model__description, y: item[field], yMin: item.yMin, yMax: item.yMax }));
+        const data = rawData.map(item => ({ x: item.model__description, y: item[field], yMin: item.yMin, yMax: item.yMax, count: item.count }));
 
         if (canvas.chartInstance) canvas.chartInstance.destroy();
         canvas.chartInstance = new Chart(canvas.getContext('2d'), {
@@ -29,7 +29,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     legend: { display: false },
                     tooltip: { callbacks: { label: ctx => {
                                 const r = ctx.raw;
-                                return `${title}: ${r.y.toFixed(decimals)} (${r.yMin.toFixed(decimals)} - ${r.yMax.toFixed(decimals)})`;
+                                const evaluationText = r.count === 1 ? 'evaluation' : 'evaluations';
+                                return `${title}: ${r.y.toFixed(decimals)} (${r.yMin.toFixed(decimals)} - ${r.yMax.toFixed(decimals)}) | ${r.count} ${evaluationText}`;
                             } } }
                 },
                 scales: {
