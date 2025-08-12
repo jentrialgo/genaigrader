@@ -57,7 +57,8 @@ def compute_averages(model_values, value_name):
             'model__description': model,
             'avg': round(avg, 2),
             'yMin': round(cinf, 2),
-            'yMax': round(csup, 2)
+            'yMax': round(csup, 2),
+            'count': len(values)
         })
     
     return model_averages, []
