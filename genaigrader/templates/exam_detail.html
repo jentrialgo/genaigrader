@@ -59,6 +59,7 @@
                     <th>Prompt</th>
                     <th>Grade</th>
                     <th>Time (s)</th>
+                    <th>Notes</th>
                     <th>Actions</th>
                 </tr>
             </thead>
@@ -70,6 +71,7 @@
                     <td class="truncate-text">{{ eval.prompt|truncatechars:30 }}</td>
                     <td>{{ eval.grade }}</td>
                     <td>{{ eval.time|floatformat:2 }}</td>
+                    <td class="truncate-text">{{ eval.notes|default:""|truncatechars:30 }}</td>
                     <td>
                         <button class="delete-btn small" onclick="deleteEvaluation(this)">🗑️</button>
                     </td>
