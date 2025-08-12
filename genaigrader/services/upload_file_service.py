@@ -85,12 +85,14 @@ def handle_file_upload(request):
 
         # Step 5: stream LLM response
         user_prompt = request.POST.get('user_prompt', '')
+        notes = request.POST.get('notes', '')
         stream = stream_responses(
             Question.objects.filter(exam=exam),
             user_prompt,
             llm,
             len(questions_data),
-            exam
+            exam,
+            notes
         )
         return StreamingHttpResponse(stream, content_type='text/event-stream')
 

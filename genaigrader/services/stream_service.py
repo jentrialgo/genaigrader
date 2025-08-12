@@ -10,7 +10,7 @@ from genaigrader.services.ollama_version_service import get_evaluation_ollama_ve
 # Set logging level to INFO
 logging.basicConfig(level=logging.INFO)
 
-def stream_responses(questions, user_prompt, llm, total_questions, exam):
+def stream_responses(questions, user_prompt, llm, total_questions, exam, notes=None):
     """
     Streams evaluation results for each question, yielding JSON-encoded progress updates.
 
@@ -20,6 +20,7 @@ def stream_responses(questions, user_prompt, llm, total_questions, exam):
     - llm: An instance of LlmApi, encapsulating model configuration and interaction.
     - total_questions: Total number of questions to evaluate.
     - exam: The Exam object associated with this evaluation.
+    - notes: Optional notes for the evaluation (e.g., exam difficulty, hardware used).
 
     Yields:
     - str: Server-sent event JSON containing progress and evaluation details.
@@ -39,7 +40,8 @@ def stream_responses(questions, user_prompt, llm, total_questions, exam):
         model=llm.model_obj, 
         exam=exam,
         time=0.0,
-        ollama_version=get_evaluation_ollama_version(llm.model_obj)
+        ollama_version=get_evaluation_ollama_version(llm.model_obj),
+        notes=notes
     )
 
     for index, question in enumerate(questions):

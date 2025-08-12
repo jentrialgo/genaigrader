@@ -62,6 +62,10 @@
         <textarea id="user-prompt" name="user_prompt" placeholder="Write your prompt... (optional)" class="eval-user-prompt-fullwidth" rows="3"></textarea>
     </div>
     <div class="batch-eval-form-row">
+        <label for="notes">Notes:</label>
+        <textarea id="notes" name="notes" placeholder="Notes for this batch evaluation... (e.g., hardware setup, experimental conditions)" class="eval-user-prompt-fullwidth" rows="2"></textarea>
+    </div>
+    <div class="batch-eval-form-row">
         <label for="repetitions" class="batch-eval-label">Repetitions per eval:</label>
         <input type="number" name="repetitions" id="repetitions" min="1" value="1" required>
         <button type="submit" class="batch-eval-btn">Launch Batch Evaluations</button>
