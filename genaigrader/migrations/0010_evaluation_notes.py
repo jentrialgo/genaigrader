@@ -13,6 +13,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='evaluation',
             name='notes',
-            field=models.TextField(blank=True, help_text='Optional notes for the evaluation, such as exam difficulty or hardware used', null=True),
+            field=models.TextField(blank=True, help_text='Optional notes for the evaluation', null=True),
         ),
     ]
