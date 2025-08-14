@@ -24,7 +24,7 @@ $(document).ready(function() {
                 text: 'Export CSV',
                 filename: 'evaluations_' + new Date().toISOString().split('T')[0],
                 exportOptions: {
-                    columns: [0, 1, 2, 3, 4],
+                    columns: [0, 1, 2, 3, 4, 5],
                     format: {
                         body: function(data, row, column, node) {
                             return data.replace(/<[^>]*>/g, '').replace(/�/g, '✓');
@@ -32,7 +32,7 @@ $(document).ready(function() {
                     }
                 },
                 customize: function(csv) {
-                    return 'Date,Model,Prompt,Grade,Time\n' + csv;
+                    return 'Date,Model,Prompt,Grade,Time,Notes\n' + csv;
                 }
             },
             {
@@ -40,12 +40,12 @@ $(document).ready(function() {
                 text: 'Export PDF',
                 filename: 'evaluations_' + new Date().toISOString().split('T')[0],
                 exportOptions: {
-                    columns: [0, 1, 2, 3, 4],
+                    columns: [0, 1, 2, 3, 4, 5],
                     stripHtml: true
                 },
                 customize: function(doc) {
                     doc.pageOrientation = 'landscape';
-                    doc.content[1].table.widths = ['15%', '20%', '35%', '15%', '15%'];
+                    doc.content[1].table.widths = ['15%', '20%', '30%', '10%', '10%', '15%'];
                     doc.styles.tableHeader = {
                         fillColor: '#3498db',
                         color: '#ffffff',
@@ -67,10 +67,11 @@ $(document).ready(function() {
         ],
         order: [[0, 'desc']],
         columnDefs: [
-            { orderable: true, targets: [0,1,2,3] },
-            { orderable: false, targets: [4] },
+            { orderable: true, targets: [0,1,2,3,4] },
+            { orderable: false, targets: [5,6,7] },
             { width: '15%', targets: [0,3,4] },
-            { className: 'dt-body-center', targets: [3,4] }
+            { width: '8%', targets: [6,7] },
+            { className: 'dt-body-center', targets: [3,4,6,7] }
         ],
         language: {
             url: '//cdn.datatables.net/plug-ins/1.13.7/i18n/en-US.json',
@@ -78,6 +79,14 @@ $(document).ready(function() {
                 csv: 'Export CSV',
                 pdf: 'Export PDF'
             }
+        }
+    });
+
+    // Hardware info modal functionality
+    $(document).on('click', '.hardware-info-trigger', function() {
+        const hardwareData = $(this).data('hardware');
+        if (hardwareData) {
+            showHardwareModal(hardwareData);
         }
     });
 });
@@ -100,6 +109,74 @@ function deleteEvaluation(button) {
                 alert('Error deleting');
             }
         });
+    }
+}
+
+function showHardwareModal(hardwareJson) {
+    try {
+        const hardware = JSON.parse(hardwareJson);
+        let content = '<div class="hardware-info-content">';
+        
+        // System information
+        if (hardware.system || hardware.machine || hardware.processor) {
+            content += '<h4>System Information</h4><ul>';
+            if (hardware.system) content += `<li><strong>OS:</strong> ${hardware.system}</li>`;
+            if (hardware.machine) content += `<li><strong>Architecture:</strong> ${hardware.machine}</li>`;
+            if (hardware.processor) content += `<li><strong>Processor:</strong> ${hardware.processor}</li>`;
+            if (hardware.cpu_count) content += `<li><strong>CPU Cores:</strong> ${hardware.cpu_count}</li>`;
+            content += '</ul>';
+        }
+        
+        // GPU/Memory information
+        if (hardware.gpu_vram_mb) {
+            content += '<h4>Graphics</h4><ul>';
+            content += `<li><strong>GPU VRAM:</strong> ${hardware.gpu_vram_mb} MB</li>`;
+            content += '</ul>';
+        }
+        
+        // Ollama information  
+        if (hardware.ollama_running || hardware.ollama_version) {
+            content += '<h4>Ollama Information</h4><ul>';
+            if (hardware.ollama_running) content += `<li><strong>Status:</strong> Running</li>`;
+            if (hardware.ollama_version) content += `<li><strong>Version:</strong> ${hardware.ollama_version}</li>`;
+            content += '</ul>';
+        }
+        
+        // Platform details
+        if (hardware.platform) {
+            content += '<h4>Platform Details</h4><ul>';
+            content += `<li><strong>Platform:</strong> ${hardware.platform}</li>`;
+            content += '</ul>';
+        }
+        
+        content += '</div>';
+        
+        // Create and show modal
+        const modal = $(`
+            <div class="hardware-modal-overlay">
+                <div class="hardware-modal">
+                    <div class="hardware-modal-header">
+                        <h3>Hardware Information</h3>
+                        <button class="hardware-modal-close">&times;</button>
+                    </div>
+                    <div class="hardware-modal-body">
+                        ${content}
+                    </div>
+                </div>
+            </div>
+        `);
+        
+        $('body').append(modal);
+        
+        // Close modal handlers
+        modal.on('click', '.hardware-modal-close, .hardware-modal-overlay', function(e) {
+            if (e.target === this) {
+                modal.remove();
+            }
+        });
+        
+    } catch (e) {
+        alert('Error parsing hardware information');
     }
 }
 

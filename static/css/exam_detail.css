@@ -280,3 +280,122 @@
       bottom: -6px;
   }
 }
+
+/* Hardware Info Styles */
+.hardware-info-cell {
+  text-align: center;
+}
+
+.hardware-info-trigger {
+  cursor: pointer;
+  font-size: 1.2em;
+  padding: 0.3rem;
+  border-radius: 4px;
+  transition: var(--transition);
+  display: inline-block;
+}
+
+.hardware-info-trigger:hover {
+  background-color: var(--primary-color);
+  transform: scale(1.1);
+}
+
+.no-hardware-info {
+  color: var(--text-light);
+  font-style: italic;
+}
+
+/* Hardware Modal Styles */
+.hardware-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.hardware-modal {
+  background: var(--background-medium);
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-md);
+  max-width: 500px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.hardware-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.hardware-modal-header h3 {
+  color: var(--primary-color);
+  margin: 0;
+  font-size: 1.3rem;
+}
+
+.hardware-modal-close {
+  background: none;
+  border: none;
+  color: var(--text-light);
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0.5rem;
+  border-radius: 4px;
+  transition: var(--transition);
+}
+
+.hardware-modal-close:hover {
+  background-color: var(--background-dark);
+  color: var(--text-color);
+}
+
+.hardware-modal-body {
+  padding: 1.5rem;
+}
+
+.hardware-info-content h4 {
+  color: var(--primary-color);
+  margin-bottom: 0.5rem;
+  margin-top: 1rem;
+  font-size: 1.1rem;
+}
+
+.hardware-info-content h4:first-child {
+  margin-top: 0;
+}
+
+.hardware-info-content ul {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 1rem 0;
+  background: var(--background-dark);
+  border-radius: 6px;
+  padding: 1rem;
+}
+
+.hardware-info-content li {
+  color: var(--text-color);
+  padding: 0.25rem 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.hardware-info-content li:last-child {
+  border-bottom: none;
+}
+
+.hardware-info-content strong {
+  color: var(--text-light);
+  min-width: 120px;
+  display: inline-block;
+}

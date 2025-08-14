@@ -60,6 +60,7 @@
                     <th>Grade</th>
                     <th>Time (s)</th>
                     <th>Notes</th>
+                    <th>Hardware</th>
                     <th>Actions</th>
                 </tr>
             </thead>
@@ -72,6 +73,13 @@
                     <td>{{ eval.grade }}</td>
                     <td>{{ eval.time|floatformat:2 }}</td>
                     <td class="truncate-text">{{ eval.notes|default:""|truncatechars:30 }}</td>
+                    <td class="hardware-info-cell">
+                        {% if eval.hardware_info %}
+                            <span class="hardware-info-trigger" data-hardware="{{ eval.hardware_info }}" title="Click to view hardware details">🖥️</span>
+                        {% else %}
+                            <span class="no-hardware-info" title="No hardware info available">-</span>
+                        {% endif %}
+                    </td>
                     <td>
                         <button class="delete-btn small" onclick="deleteEvaluation(this)">🗑️</button>
                     </td>
