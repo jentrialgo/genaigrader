@@ -5,7 +5,8 @@ from genaigrader.models import Course, Exam, Model, Evaluation, Question, Questi
 from genaigrader.services.hardware_annotation_service import (
     get_system_hardware_info, 
     get_ollama_hardware_info,
-    get_hardware_annotation
+    get_hardware_annotation,
+    _is_ollama_local
 )
 
 
@@ -176,3 +177,81 @@ class HardwareAnnotationTest(TestCase):
         
         saved_evaluation = Evaluation.objects.get(id=evaluation.id)
         self.assertIsNone(saved_evaluation.hardware_info)
+
+    @patch('genaigrader.services.hardware_annotation_service.OLLAMA_BASE_URL', 'http://localhost:11434')
+    def test_is_ollama_local_localhost(self):
+        """Test _is_ollama_local returns True for localhost"""
+        self.assertTrue(_is_ollama_local())
+
+    @patch('genaigrader.services.hardware_annotation_service.OLLAMA_BASE_URL', 'http://127.0.0.1:11434')
+    def test_is_ollama_local_127_0_0_1(self):
+        """Test _is_ollama_local returns True for 127.0.0.1"""
+        self.assertTrue(_is_ollama_local())
+
+    @patch('genaigrader.services.hardware_annotation_service.OLLAMA_BASE_URL', 'http://remote-server.com:11434')
+    def test_is_ollama_local_remote(self):
+        """Test _is_ollama_local returns False for remote server"""
+        self.assertFalse(_is_ollama_local())
+
+    @patch('genaigrader.services.hardware_annotation_service._is_ollama_local')
+    @patch('genaigrader.services.hardware_annotation_service.get_ollama_hardware_info')
+    @patch('genaigrader.services.hardware_annotation_service.get_system_hardware_info')
+    def test_get_hardware_annotation_local_ollama(self, mock_system_info, mock_ollama_info, mock_is_local):
+        """Test hardware annotation for local models with local Ollama"""
+        # Mock local Ollama
+        mock_is_local.return_value = True
+        mock_system_info.return_value = {
+            'system': 'Linux',
+            'machine': 'x86_64',
+            'cpu_count': 8
+        }
+        mock_ollama_info.return_value = {
+            'ollama_running': True,
+            'gpu_vram_mb': 8192
+        }
+        
+        annotation = get_hardware_annotation(self.local_model)
+        
+        self.assertIsNotNone(annotation)
+        # Should be valid JSON
+        data = json.loads(annotation)
+        self.assertEqual(data['system'], 'Linux')
+        self.assertEqual(data['machine'], 'x86_64')
+        self.assertEqual(data['cpu_count'], 8)
+        self.assertTrue(data['ollama_running'])
+        self.assertEqual(data['gpu_vram_mb'], 8192)
+        
+        # Verify both functions were called for local setup
+        mock_system_info.assert_called_once()
+        mock_ollama_info.assert_called_once()
+
+    @patch('genaigrader.services.hardware_annotation_service._is_ollama_local')
+    @patch('genaigrader.services.hardware_annotation_service.get_ollama_hardware_info')
+    @patch('genaigrader.services.hardware_annotation_service.get_system_hardware_info')
+    def test_get_hardware_annotation_remote_ollama(self, mock_system_info, mock_ollama_info, mock_is_local):
+        """Test hardware annotation for local models with remote Ollama"""
+        # Mock remote Ollama
+        mock_is_local.return_value = False
+        mock_ollama_info.return_value = {
+            'ollama_running': True,
+            'ollama_version': '0.1.0',
+            'gpu_vram_mb': 16384
+        }
+        
+        annotation = get_hardware_annotation(self.local_model)
+        
+        self.assertIsNotNone(annotation)
+        # Should be valid JSON with only Ollama info
+        data = json.loads(annotation)
+        self.assertTrue(data['ollama_running'])
+        self.assertEqual(data['ollama_version'], '0.1.0')
+        self.assertEqual(data['gpu_vram_mb'], 16384)
+        
+        # Should NOT contain local system info
+        self.assertNotIn('system', data)
+        self.assertNotIn('machine', data)
+        self.assertNotIn('cpu_count', data)
+        
+        # Verify only ollama info was called, not system info
+        mock_system_info.assert_not_called()
+        mock_ollama_info.assert_called_once()

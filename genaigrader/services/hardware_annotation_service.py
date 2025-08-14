@@ -5,6 +5,7 @@ import os
 import ollama
 import requests
 from typing import Dict, Optional
+from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
 
@@ -12,9 +13,29 @@ logger = logging.getLogger(__name__)
 from genaigrader.views.api_views import OLLAMA_BASE_URL
 
 
+def _is_ollama_local() -> bool:
+    """
+    Check if Ollama is running on the local machine.
+    
+    Returns:
+        True if Ollama is local, False if remote
+    """
+    try:
+        parsed_url = urlparse(OLLAMA_BASE_URL)
+        hostname = parsed_url.hostname
+        
+        # Consider localhost, 127.0.0.1, and empty/None as local
+        local_hosts = {'localhost', '127.0.0.1', '::1', None, ''}
+        return hostname in local_hosts
+    except Exception:
+        # If we can't parse the URL, assume it's local for backward compatibility
+        return True
+
+
 def get_system_hardware_info() -> Dict[str, Optional[str]]:
     """
     Get basic system hardware information using Python standard library.
+    Only used when Ollama is running locally.
     
     Returns:
         Dict containing basic system information
@@ -83,6 +104,7 @@ def get_ollama_hardware_info() -> Dict[str, Optional[str]]:
 def get_hardware_annotation(model_instance) -> Optional[str]:
     """
     Get standardized hardware annotation for an evaluation.
+    Only collects hardware info from the machine where Ollama is running.
     
     Args:
         model_instance: The Model instance being used
@@ -101,10 +123,14 @@ def get_hardware_annotation(model_instance) -> Optional[str]:
     if ollama_info:
         hardware_info.update(ollama_info)
     
-    # Get basic system info
-    system_info = get_system_hardware_info()
-    if system_info:
-        hardware_info.update(system_info)
+    # Only get system info if Ollama is running locally
+    # This ensures we get hardware info from the machine where models actually run
+    if _is_ollama_local():
+        system_info = get_system_hardware_info()
+        if system_info:
+            hardware_info.update(system_info)
+    else:
+        logger.debug("Ollama is remote, skipping local system hardware info collection")
     
     # Return as JSON string if we have any info
     if hardware_info:
