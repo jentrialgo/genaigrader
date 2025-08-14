@@ -119,6 +119,7 @@ class Evaluation(models.Model):
     exam = models.ForeignKey(Exam, on_delete=models.CASCADE)
     ollama_version = models.CharField(max_length=50, null=True, blank=True, help_text="Version of Ollama used (null for external models)")
     notes = models.TextField(blank=True, null=True, help_text="Optional notes for the evaluation")
+    hardware_info = models.TextField(blank=True, null=True, help_text="Hardware information for local model evaluations (JSON format)")
 
     def __str__(self):
         return f'{self.prompt} {self.grade}'

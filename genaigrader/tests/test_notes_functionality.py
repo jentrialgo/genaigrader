@@ -59,10 +59,12 @@ class NotesfunctionalityTest(TestCase):
         
     @patch('genaigrader.services.stream_service.generate_prompt')
     @patch('genaigrader.services.stream_service.get_evaluation_ollama_version')
-    def test_stream_responses_handles_notes_parameter(self, mock_ollama_version, mock_generate_prompt):
+    @patch('genaigrader.services.stream_service.get_hardware_annotation')
+    def test_stream_responses_handles_notes_parameter(self, mock_hardware_annotation, mock_ollama_version, mock_generate_prompt):
         """Test that stream_responses correctly handles the notes parameter"""
         # Mock dependencies
         mock_ollama_version.return_value = "1.0.0"
+        mock_hardware_annotation.return_value = '{"system": "Linux", "cpu_count": 4}'
         mock_generate_prompt.return_value = {
             'prompt': 'Test prompt',
             'question_prompt': 'What is 2+2?',
@@ -90,10 +92,12 @@ class NotesfunctionalityTest(TestCase):
         
     @patch('genaigrader.services.stream_service.generate_prompt')
     @patch('genaigrader.services.stream_service.get_evaluation_ollama_version')
-    def test_stream_responses_works_without_notes(self, mock_ollama_version, mock_generate_prompt):
+    @patch('genaigrader.services.stream_service.get_hardware_annotation')
+    def test_stream_responses_works_without_notes(self, mock_hardware_annotation, mock_ollama_version, mock_generate_prompt):
         """Test that stream_responses works correctly when no notes are provided"""
         # Mock dependencies
         mock_ollama_version.return_value = "1.0.0"
+        mock_hardware_annotation.return_value = None  # No hardware annotation
         mock_generate_prompt.return_value = {
             'prompt': 'Test prompt',
             'question_prompt': 'What is 2+2?',
