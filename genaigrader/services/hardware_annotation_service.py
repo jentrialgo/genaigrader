@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 
 # Import the same base URL used elsewhere in the project  
 from genaigrader.views.api_views import OLLAMA_BASE_URL
+from genaigrader.models import Model
 
 
 def _is_ollama_local() -> bool:
@@ -101,7 +102,7 @@ def get_ollama_hardware_info() -> Dict[str, Optional[str]]:
         return {}
 
 
-def get_hardware_annotation(model_instance) -> Optional[str]:
+def get_hardware_annotation(model_instance: Model) -> Optional[str]:
     """
     Get standardized hardware annotation for an evaluation.
     Only collects hardware info from the machine where Ollama is running.
