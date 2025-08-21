@@ -5,16 +5,19 @@ function updateProgressBar(progress) {
 
 function appendResponseDetails(progress) {
   const response = progress.response;
-  const responseColor = response.is_correct ? "var(--success-color)" : "var(--error-color)";
+  const responseClass = response.is_correct ? "correct-response" : "incorrect-response";
+  const correctnessIcon = response.is_correct ? "✅" : "❌";
+  
   const detailsHtml = `
-    <div style="border: 1px solid var(--border-color); padding: 10px; margin: 10px 0; border-radius: 5px; background: var(--background-medium);">
+    <div class="exam-detail-box">
       <p><strong>Response time:</strong> ${progress.time}s</p>
       <p><strong>Prompt:</strong></p>
       <pre>${response.user_prompt}</pre>
       <p><strong>Question ${progress.processed_questions}:</strong></p>
       <pre>${response.question_prompt}</pre>
-      <p><strong>Model response:</strong> <span style="color: ${responseColor}; font-weight: bold;">${response.response}</span></p>
+      <p><strong>Model response:</strong> <span class="model-response-text ${responseClass}">${response.response}</span><span class="correctness-icon">${correctnessIcon}</span></p>
       <p><strong>Correct option:</strong> ${response.correct_option}</p>
+      <div class="question-time">Time: ${progress.time}s</div>
     </div>
   `;
   $("#exam-details").append(detailsHtml);

@@ -2,6 +2,8 @@
   --primary-color: #3b82f6;       
   --secondary-color: #1e3a8a;    
   --accent-color: #60a5fa;       
+  --success-color: #22c55e;       
+  --error-color: #ef4444;         
   --background-dark: #0f172a;     
   --background-medium: #1e293b;   
   --text-color: #f8fafc;          
@@ -176,4 +178,46 @@ input, textarea, select {
   font-size: 1em;
   font-family: inherit;
   margin-top: 0.3rem;
+}
+
+/* Shared Result Display Components */
+.exam-detail-box {
+  margin: 1rem 0;
+  padding: 1.5rem;
+  background: var(--background-dark);
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+}
+
+.exam-detail-box pre {
+  padding: 1rem;
+  background: rgba(0,0,0,0.3);
+  border-radius: 6px;
+  white-space: pre-wrap;
+}
+
+.model-response-text {
+  font-weight: 600;
+  color: var(--text-color);
+}
+
+.correct-response {
+  color: var(--success-color);
+  font-weight: bold;
+}
+
+.incorrect-response {
+  color: var(--error-color);
+  font-weight: bold;
+}
+
+.correctness-icon {
+  margin-left: 10px;
+  font-size: 1.2em;
+}
+
+.question-time {
+  color: var(--text-light);
+  font-size: 0.9em;
+  margin-top: 0.5rem;
 }
