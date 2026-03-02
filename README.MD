@@ -19,13 +19,21 @@ GenAI Grader is a web platform for automated exam grading using both local (Olla
    cd genaigrader
    ```
 
-2. **Install dependencies**
+2. **Install dependencies and Ollama**
+   To install `uv`, run:
+   ```bash
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+   ```
+   Then, install dependencies:
    ```sh
    uv pip install -r requirements.txt
    ```
-   Or use pip:
+
+   To use local models, install [Ollama](https://ollama.com/) and start the service:
    ```sh
-   pip install -r requirements.txt
+   # On Linux:
+   curl -fsSL https://ollama.com/install.sh | sh
+   ollama serve
    ```
 
 3. **Configure environment variables**
@@ -33,13 +41,13 @@ GenAI Grader is a web platform for automated exam grading using both local (Olla
 
 4. **Run migrations and collect static files**
    ```sh
-   python manage.py migrate
-   python manage.py collectstatic
+   uv run manage.py migrate
+   uv run manage.py collectstatic
    ```
 
 5. **Start the server**
    ```sh
-   python manage.py runserver
+   uv run manage.py runserver
    ```
    Or use the scripts in `scripts/` for production/development with tmux and Gunicorn.
 
