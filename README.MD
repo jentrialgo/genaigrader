@@ -35,9 +35,13 @@ GenAI Grader is a web platform for automated exam grading using both local (Olla
    curl -fsSL https://ollama.com/install.sh | sh
    ollama serve
    ```
+   *Note: Remember to pull the models you want to use (e.g., `ollama pull llama3`).*
 
 3. **Configure environment variables**
-   Copy `.env.example` to `.env` and adjust the values as needed.
+   Copy `.env.example` to `.env`. (Note: The `start_genaigrader.sh` script specifically looks for `.env.django`).
+   ```sh
+   cp .env.example .env
+   ```
 
 4. **Run migrations and collect static files**
    ```sh
@@ -45,11 +49,15 @@ GenAI Grader is a web platform for automated exam grading using both local (Olla
    uv run manage.py collectstatic
    ```
 
-5. **Start the server**
+5. **Start the server** (locally on port 8000)
    ```sh
    uv run manage.py runserver
    ```
-   Or use the scripts in `scripts/` for production/development with tmux and Gunicorn.
+   Or use the automated scripts in `scripts/`:
+   ```sh
+   bash scripts/start_genaigrader.sh
+   ```
+   *Note: The script uses port 9898 and expects several configurations. Check `scripts/README.md` for more details.*
 
 ## Usage
 
