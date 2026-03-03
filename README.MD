@@ -58,50 +58,58 @@ GenAI Grader is a web platform for automated exam grading using both local (Olla
    bash scripts/start_genaigrader.sh
    ```
    *Note: The script uses port 9898 and expects several configurations. Check `scripts/README.md` for more details.*
-
 ## Installation - Windows
-   **1. Clone the repository**
-      ```powershell
-      git clone <your-repo-url>
-      cd genaigrader
-      ```
-      
 
-    **2. Install dependencies and Ollama**
-      To install `uv` (our Python package manager) on Windows, open your PowerShell and run:
+**1. Clone the repository**
+```powershell
+git clone <your-repo-url>
+cd genaigrader
+```
 
-      ```powershell
-         powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex""
-       ```
-      
-      Then, install the project dependencies:
-       ```powershell
-         uv pip install -r requirements.txt```
-            Note: You may need to restart your terminal after this step so it recognizes the uv command.
-      To use local models, you need to install Ollama:
-         1.Download Ollama:
-             ```powershell
-            irm https://ollama.com/install.ps1 | iex ```
-         2.Opull the models you want to use (e.g., Qwen 2.5 (0.5B)):
-             ```powershell
-            ollama pull qwen2.5:0.5b ```
+**2. Install dependencies and Ollama**
+To install `uv` (our Python package manager) on Windows, open your PowerShell and run:
 
+```powershell
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
 
-      **3. Configure environment variables**
-         Copy `.env.example` to `.env`. (Note: The automated `.sh` scripts specifically look for `.env.django`, but for local Windows development, a standard `.env` file is what you need).
-         ```powershell
-            cp .env.example .env
-         ```
-      **4. Configure environment variables**
-         ```powershell
-         uv run manage.py migrate
-         uv run manage.py collectstatic
-         ```
-      **5. Start the server (locally on port 8000)**
-         ```powershell
-         uv run manage.py runserver
-         ```
+> **Note:** You may need to restart your terminal after this step so it recognizes the `uv` command.
 
+Then, install the project dependencies:
+
+```powershell
+uv pip install -r requirements.txt
+```
+
+To use local models, you need to install Ollama:
+
+1. Download Ollama:
+```powershell
+irm https://ollama.com/install.ps1 | iex
+```
+
+2. Pull the models you want to use (e.g., Qwen 2.5 (0.5B)):
+```powershell
+ollama pull qwen2.5:0.5b
+```
+
+**3. Configure environment variables**
+Copy `.env.example` to `.env`. (Note: The automated `.sh` scripts specifically look for `.env.django`, but for local Windows development, a standard `.env` file is what you need).
+
+```powershell
+cp .env.example .env
+```
+
+**4. Run migrations and collect static files**
+```powershell
+uv run manage.py migrate
+uv run manage.py collectstatic
+```
+
+**5. Start the server (locally on port 8000)**
+```powershell
+uv run manage.py runserver
+```
 ## Usage
 
 1. Access the app at `http://localhost:8000/`.
