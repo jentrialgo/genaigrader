@@ -13,7 +13,7 @@ def generate_prompt(question, user_prompt):
     user_prompt_part = user_prompt or ""
     
     user_prompt_part += (
-        "\n\nTe voy a pasar una pregunta de test y tienes que responderme con qué opción es la correcta. "
+        "Te voy a pasar una pregunta de test y tienes que responderme con qué opción es la correcta. "
         "Sólo debes decirme la opción, por ejemplo 'a', absolutamente nada más.\n"
     )
 
