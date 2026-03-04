@@ -97,7 +97,7 @@ def handle_file_upload(request):
             )
             return StreamingHttpResponse(stream, content_type='text/event-stream')
         else:
-            return HttpResponse(f"Error: An exam with the name '{uploaded_file.name}' already exists in this course.",status=400)
+            return HttpResponse(f"Error: An exam with the name '{uploaded_file.name}' already exists in this course.",status=409)
 
     except Exception as e:
         return HttpResponse(f"Error: {str(e)}", status=400)
