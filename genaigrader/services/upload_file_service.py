@@ -75,7 +75,7 @@ def handle_file_upload(request):
         # Step 2: model validation
         llm = validate_model(request)
 
-        if is_unique_exam(uploaded_file,course,user,llm):
+        if is_unique_exam(uploaded_file,course,user,llm): #TODO Decide if we dont to allow the revaluation of the same exam or we just show a warning
             # Step 3: file parsing and validation
             questions_data = parse_and_validate_file(uploaded_file)
 
