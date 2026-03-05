@@ -102,6 +102,10 @@ function deleteEvaluation(button) {
         });
     }
 }
+//TODO FUNCTION TO SHOW THE AVERAGE PER QUESTION
+//Input: A question ID
+//Output: A chart with the average grade and time for that question across all evaluations, including the model used.
+
 
 // Charts with confidence intervals
 document.addEventListener('DOMContentLoaded', function () {
