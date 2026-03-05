@@ -45,7 +45,7 @@ def delete_evaluation(request, eval_id):
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
 
-@login_required
+#@login_required
 @require_http_methods(["GET"])
 def question_analytics(request, question_id):
     try:

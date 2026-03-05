@@ -29,27 +29,23 @@ def calculate_question_analytics(question):
                 'model_id': model.id,
                 'model_name': model.description,
                 'correct': 0,
-                'total': 0,
-                'times': []
+                'total': 0
             }
 
         # Check if answer is correct
         is_correct = question_evaluation.question_option_id == question.correct_option
         models_data[model_key]['correct'] += int(is_correct)
         models_data[model_key]['total'] += 1
-        models_data[model_key]['times'].append(question.evaluation.time)
     results = []
 
     # Calculate accuracy and average time for each model, using the data obtained before
     for model_data in models_data.values():
         accuracy = (model_data['correct'] / model_data['total'] * 100) if model_data['total'] > 0 else 0
-        avg_time = sum(model_data['times']) / len(model_data['times']) if model_data['times'] else 0
 
         results.append({
             'model_id': model_data['model_id'],
             'model_name': model_data['model_name'],
             'accuracy': round(accuracy, 2),
-            'avg_time': round(avg_time, 2),
             'total_evaluations': model_data['total']
         })
 

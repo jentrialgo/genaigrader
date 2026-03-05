@@ -41,7 +41,8 @@ urlpatterns = [
     #This is the URL that the frontend will call to upload the exam file. It is handled by the upload_file view which processes the file and creates the necessary database entries.
     path('upload/', upload_file, name='upload_file'),
     path('exam/<int:exam_id>/', exam_detail, name='exam_detail'),
-    path('exam/<int:question_id>/', question_analytics, name='question_analytics'),
+    #TODO ADD URL FOR THE ENDPOINT OF THE QUESTIONS ANALYTICS
+    path('question/<int:question_id>/analytics/', question_analytics, name='question_analytics'),
     path('analysis/', analysis_view, name='analysis'),
     path('api/', api_view, name='api'),
     path('batch-evaluations/', batch_evaluations_view, name='batch_evaluations'),

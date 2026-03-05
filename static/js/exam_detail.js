@@ -104,7 +104,49 @@ function deleteEvaluation(button) {
 }
 //TODO FUNCTION TO SHOW THE AVERAGE PER QUESTION
 //Input: A question ID
-//Output: A chart with the average grade and time for that question across all evaluations, including the model used.
+//Output: A table with the average grade, time, and number of evaluations for each model for that question
+function loadQuestionAnalytics(questionId) {
+    const tbody = document.getElementById(`analyticsBody--${questionId}`);
+    const table = document.getElementById(`questionAnalyticsTable--${questionId}`);
+
+    // Ponemos un mensaje de cargando
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Cargando datos...</td></tr>';
+    table.style.display = 'table';
+
+    // Llamamos a la URL que acabamos de crear en urls.py
+    fetch(`/question/${questionId}/analytics/`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Limpiamos la tabla
+                tbody.innerHTML = '';
+
+                // Si no hay datos
+                if (data.data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">No hay evaluaciones aún.</td></tr>';
+                    return;
+                }
+
+                // Pintamos cada modelo en una fila
+                data.data.forEach(stat => {
+                    tbody.innerHTML += `
+                        <tr>
+                            <td><strong>${stat.model_name}</strong></td>
+                            <td>${stat.accuracy} %</td>
+                            <td>${stat.avg_time} s</td>
+                            <td>${stat.total_evaluations}</td>
+                        </tr>
+                    `;
+                });
+            } else {
+                tbody.innerHTML = `<tr><td colspan="4" style="color:red;">Error: ${data.error}</td></tr>`;
+            }
+        })
+        .catch(error => {
+            console.error("Error cargando analíticas:", error);
+            tbody.innerHTML = '<tr><td colspan="4" style="color:red;">Error de conexión.</td></tr>';
+        });
+}
 
 
 // Charts with confidence intervals
@@ -218,4 +260,11 @@ document.addEventListener('DOMContentLoaded', function () {
             1
         );
     }
+    const containers = document.querySelectorAll('[id^="questionAnalyticsContainer--"]');
+    containers.forEach(container => {
+        const questionId = container.id.split('--')[1];
+        if (questionId) {
+            loadQuestionAnalytics(questionId);
+        }
+    });
 });

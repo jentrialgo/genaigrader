@@ -42,7 +42,19 @@
                 </ul>
             </div>
         </div>
-            //TODO: Here it goes the calculation of the average grade and time for each question.
+        <div id="questionAnalyticsContainer--{{ question.id }}" class="analytics-container">
+        <h3>Question statistics</h3>
+        <table id="questionAnalyticsTable--{{ question.id }}" class="analytics-table" style="display: none; margin-top: 10px;">
+            <thead>
+                <tr>
+                    <th>Model</th>
+                    <th>Accuracy (%)</th>
+                    <th>Total evaluations</th>
+                </tr>
+            </thead>
+            <tbody id="analyticsBody--{{ question.id }}"></tbody>
+        </table>
+        </div>
         {% empty %}
         <p class="no-questions">No questions in this exam</p>
         {% endfor %}
@@ -51,7 +63,7 @@
     <!-- Evaluations Section -->
     <div class="evaluations-section">
         <h3>Evaluation History</h3>
-        
+
         <table id="evaluationsTable" class="display compact" style="width:100%">
             <thead>
                 <tr>
