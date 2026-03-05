@@ -33,7 +33,7 @@ def calculate_question_analytics(question):
             }
 
         # Check if answer is correct
-        is_correct = question_evaluation.question_option_id == question.correct_option
+        is_correct = question_evaluation.question_option_id == question.correct_option.id
         models_data[model_key]['correct'] += int(is_correct)
         models_data[model_key]['total'] += 1
     results = []

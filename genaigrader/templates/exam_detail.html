@@ -5,7 +5,7 @@
 {% block header %}GenAI Grader - Exam Detail{% endblock %}
 
 {% block extra_css %}
-  <link rel="stylesheet" href="{% static 'css/exam_detail.css' %}">
+  <link rel="stylesheet" href="{% static 'css/exam_detail.css' %}?v=1">
   <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.13.7/css/jquery.dataTables.min.css">
   <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.dataTables.min.css">
 {% endblock %}
@@ -42,18 +42,18 @@
                 </ul>
             </div>
         </div>
-        <div id="questionAnalyticsContainer--{{ question.id }}" class="analytics-container">
-        <h3>Question statistics</h3>
-        <table id="questionAnalyticsTable--{{ question.id }}" class="analytics-table" style="display: none; margin-top: 10px;">
-            <thead>
-                <tr>
-                    <th>Model</th>
-                    <th>Accuracy (%)</th>
-                    <th>Total evaluations</th>
-                </tr>
-            </thead>
-            <tbody id="analyticsBody--{{ question.id }}"></tbody>
-        </table>
+            <div id="questionAnalyticsContainer--{{ question.id }}" class="analytics-container">
+            <h3>Question statistics</h3>
+            <table id="questionAnalyticsTable--{{ question.id }}" class="analytics-table" style="display: none; margin-top: 10px;">
+                <thead>
+                    <tr>
+                        <th>Model</th>
+                        <th>Accuracy (%)</th>
+                        <th>Total evaluations</th>
+                    </tr>
+                </thead>
+                <tbody id="analyticsBody--{{ question.id }}"></tbody>
+            </table>
         </div>
         {% empty %}
         <p class="no-questions">No questions in this exam</p>
@@ -114,15 +114,15 @@
 {% endblock %}
 
 {% block extra_scripts %}
-<script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+<!--<script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>-->
 <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-error-bars@4.4.1/build/index.umd.min.js"></script>
-<script src="{% static 'js/exam_detail.js' %}"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/pdfmake.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/vfs_fonts.js"></script>
 <script src="https://cdn.datatables.net/buttons/2.4.2/js/dataTables.buttons.min.js"></script>
 <script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.html5.min.js"></script>
 <script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.print.min.js"></script>
+    <script src="{% static 'js/exam_detail.js' %}?v=3"></script>
 {% endblock %}

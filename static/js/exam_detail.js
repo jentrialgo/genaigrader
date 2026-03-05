@@ -27,7 +27,7 @@ $(document).ready(function() {
                     columns: [0, 1, 2, 3, 4],
                     format: {
                         body: function(data, row, column, node) {
-                            return data.replace(/<[^>]*>/g, '').replace(/�/g, '✓');
+                            return data.replace(/<[^>]*>/g, '').replace(/\?/g, '✓');
                         }
                     }
                 },
@@ -102,52 +102,6 @@ function deleteEvaluation(button) {
         });
     }
 }
-//TODO FUNCTION TO SHOW THE AVERAGE PER QUESTION
-//Input: A question ID
-//Output: A table with the average grade, time, and number of evaluations for each model for that question
-function loadQuestionAnalytics(questionId) {
-    const tbody = document.getElementById(`analyticsBody--${questionId}`);
-    const table = document.getElementById(`questionAnalyticsTable--${questionId}`);
-
-    // Ponemos un mensaje de cargando
-    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Cargando datos...</td></tr>';
-    table.style.display = 'table';
-
-    // Llamamos a la URL que acabamos de crear en urls.py
-    fetch(`/question/${questionId}/analytics/`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                // Limpiamos la tabla
-                tbody.innerHTML = '';
-
-                // Si no hay datos
-                if (data.data.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">No hay evaluaciones aún.</td></tr>';
-                    return;
-                }
-
-                // Pintamos cada modelo en una fila
-                data.data.forEach(stat => {
-                    tbody.innerHTML += `
-                        <tr>
-                            <td><strong>${stat.model_name}</strong></td>
-                            <td>${stat.accuracy} %</td>
-                            <td>${stat.avg_time} s</td>
-                            <td>${stat.total_evaluations}</td>
-                        </tr>
-                    `;
-                });
-            } else {
-                tbody.innerHTML = `<tr><td colspan="4" style="color:red;">Error: ${data.error}</td></tr>`;
-            }
-        })
-        .catch(error => {
-            console.error("Error cargando analíticas:", error);
-            tbody.innerHTML = '<tr><td colspan="4" style="color:red;">Error de conexión.</td></tr>';
-        });
-}
-
 
 // Charts with confidence intervals
 document.addEventListener('DOMContentLoaded', function () {
@@ -158,22 +112,22 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const calculateRange = (data) => {
         const yValues = data.flatMap(d => [d.yMin, d.avg, d.yMax]);
-        
-        if (yValues.length === 0) return { min: -1, max: 1 }; 
-        
+
+        if (yValues.length === 0) return { min: -1, max: 1 };
+
         const globalMin = Math.min(...yValues);
         const globalMax = Math.max(...yValues);
-        
-    
+
+
         if (globalMin === globalMax) {
-            const buffer = Math.abs(globalMin) * 0.5 || 1; 
+            const buffer = Math.abs(globalMin) * 0.5 || 1;
             return {
                 min: globalMin - buffer,
                 max: globalMax + buffer
             };
         }
-        
-    
+
+
         const rangeBuffer = (globalMax - globalMin) * 0.2;
         return {
             min: globalMin - rangeBuffer,
@@ -183,7 +137,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const createErrorBarChart = (canvas, data, field, title, color, decimals = 2) => {
         const yRange = calculateRange(data);
-        
+
         new Chart(canvas, {
             type: 'barWithErrorBars',
             data: {
@@ -249,7 +203,7 @@ document.addEventListener('DOMContentLoaded', function () {
             2
         );
     }
-    
+
     if (timeAverages.length) {
         createErrorBarChart(
             document.getElementById('timeAveragesChart'),
@@ -260,11 +214,50 @@ document.addEventListener('DOMContentLoaded', function () {
             1
         );
     }
-    const containers = document.querySelectorAll('[id^="questionAnalyticsContainer--"]');
-    containers.forEach(container => {
+});
+
+// ---- AÑADIDO ----
+function loadQuestionAnalytics(questionId) {
+    const tbody = document.getElementById(`analyticsBody--${questionId}`);
+    const table = document.getElementById(`questionAnalyticsTable--${questionId}`);
+    console.log("🚀 ¡Botón pulsado! Intentando cargar la pregunta:", questionId);
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Cargando datos...</td></tr>';
+    table.style.display = 'table';
+
+    fetch(`/question/${questionId}/analytics/`)
+        .then(response => response.json())
+        .then(data => {
+            console.log("🚀Se ha cargado la respuesta", questionId);
+            if (data.success) {
+                tbody.innerHTML = '';
+                if (data.data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">No hay evaluaciones aún.</td></tr>';
+                    return;
+                }
+                data.data.forEach(stat => {
+                    tbody.innerHTML += `
+                        <tr>
+                            <td><strong>${stat.model_name}</strong></td>
+                            <td>${stat.accuracy} %</td>
+                            <td>${stat.total_evaluations}</td>
+                        </tr>
+                    `;
+                });
+            } else {
+                tbody.innerHTML = `<tr><td colspan="4" style="color:red;">Error: ${data.error}</td></tr>`;
+            }
+        })
+        .catch(error => {
+            console.error("Error cargando analíticas:", error);
+            tbody.innerHTML = '<tr><td colspan="4" style="color:red;">Error de conexión.</td></tr>';
+        });
+}
+
+// Auto-carga al entrar y listener del botón
+// (el script está al final del body, el DOM ya está listo)
+$(document).ready(function() {
+    document.querySelectorAll('[id^="questionAnalyticsContainer--"]').forEach(container => {
         const questionId = container.id.split('--')[1];
-        if (questionId) {
-            loadQuestionAnalytics(questionId);
-        }
+        if (questionId) loadQuestionAnalytics(questionId);
     });
 });

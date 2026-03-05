@@ -280,3 +280,66 @@
       bottom: -6px;
   }
 }
+/* =========================================================
+   Estilos para las Analíticas de Preguntas (Question Stats)
+   ========================================================= */
+
+.analytics-container {
+    background-color: #1e293b; /* Fondo azul oscuro/grisáceo */
+    border-radius: 8px;
+    padding: 15px 20px;
+    margin-top: 15px;
+    border: 1px solid #334155;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.analytics-container h3 {
+    margin-top: 0;
+    font-size: 1.1em;
+    color: #f8fafc;
+    border-bottom: 1px solid #334155;
+    padding-bottom: 10px;
+    margin-bottom: 15px;
+}
+
+.analytics-table {
+    width: 100%;
+    border-collapse: collapse;
+    color: #cbd5e1;
+    font-size: 0.95em;
+}
+
+.analytics-table th {
+    text-align: left;
+    padding: 12px 10px;
+    background-color: #0f172a; /* Cabecera un poco más oscura */
+    color: #94a3b8;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.85em;
+    letter-spacing: 0.05em;
+}
+
+/* Redondear las esquinas de la cabecera */
+.analytics-table th:first-child { border-top-left-radius: 6px; border-bottom-left-radius: 6px; }
+.analytics-table th:last-child { border-top-right-radius: 6px; border-bottom-right-radius: 6px; }
+
+.analytics-table td {
+    padding: 12px 10px;
+    border-bottom: 1px solid #334155;
+}
+
+/* Que la última fila no tenga borde abajo */
+.analytics-table tr:last-child td {
+    border-bottom: none;
+}
+
+/* Efecto al pasar el ratón por encima de la fila */
+.analytics-table tbody tr:hover {
+    background-color: #334155;
+    transition: background-color 0.2s ease;
+}
+
+/* Colores dinámicos para el % de acierto (Opcional, si quieres meterle clase desde JS luego) */
+.accuracy-high { color: #4ade80; font-weight: bold; } /* Verde */
+.accuracy-low { color: #f87171; font-weight: bold; } /* Rojo */
