@@ -53,4 +53,4 @@ def calculate_question_analytics(question):
             'total_evaluations': model_data['total']
         })
 
-    return HttpResponse(results)
+    return results

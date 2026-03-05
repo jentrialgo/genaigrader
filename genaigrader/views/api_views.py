@@ -1,6 +1,6 @@
 from django.shortcuts import render, get_object_or_404
 from django.http import JsonResponse, QueryDict, StreamingHttpResponse
-from genaigrader.models import Model
+from genaigrader.models import Model, Question
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods, require_GET, require_POST
 from django.contrib.auth.decorators import login_required
@@ -8,7 +8,7 @@ from django.shortcuts import get_object_or_404
 import json
 import requests
 from genaigrader.services.get_models_service import get_models_for_user
-
+from genaigrader.services.question_analytics_service import calculate_question_analytics
 
 OLLAMA_BASE_URL = "http://localhost:11434"
 
@@ -167,3 +167,12 @@ def pull_model(request):
             }, status=500)
 
     return JsonResponse({'status': 'error', 'message': 'Method not allowed'}, status=405)
+
+@require_http_methods(["GET"])
+def question_analytics_api(request, question_id):
+    try:
+        question = Question.objects.get(id=question_id)
+        stats = calculate_question_analytics(question)
+        return JsonResponse({'success': True, 'data': stats})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=400)
