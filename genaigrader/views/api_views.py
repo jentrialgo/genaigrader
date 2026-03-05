@@ -167,12 +167,3 @@ def pull_model(request):
             }, status=500)
 
     return JsonResponse({'status': 'error', 'message': 'Method not allowed'}, status=405)
-
-@require_http_methods(["GET"])
-def question_analytics_api(request, question_id):
-    try:
-        question = Question.objects.get(id=question_id)
-        stats = calculate_question_analytics(question)
-        return JsonResponse({'success': True, 'data': stats})
-    except Exception as e:
-        return JsonResponse({'success': False, 'error': str(e)}, status=400)

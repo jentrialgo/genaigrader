@@ -21,7 +21,7 @@ from genaigrader.views.auth_views import signup
 from genaigrader.views.course_views import course_view, update_course, delete_course, delete_exam, update_exam, export_all_evaluations, export_course_evaluations
 from genaigrader.views.evaluate_views import evaluate_view, upload_file
 from genaigrader.views.batch_evaluations_view import batch_evaluations_view
-from genaigrader.views.exam_details_view import exam_detail, delete_evaluation
+from genaigrader.views.exam_details_view import exam_detail, delete_evaluation, question_analytics
 from genaigrader.views.analysis_view import analysis_view
 from genaigrader.views.api_views import api_view, update_model, delete_model, create_model, pull_model
 from genaigrader.views.home_view import home_view
@@ -41,6 +41,7 @@ urlpatterns = [
     #This is the URL that the frontend will call to upload the exam file. It is handled by the upload_file view which processes the file and creates the necessary database entries.
     path('upload/', upload_file, name='upload_file'),
     path('exam/<int:exam_id>/', exam_detail, name='exam_detail'),
+    path('exam/<int:question_id>/', question_analytics, name='question_analytics'),
     path('analysis/', analysis_view, name='analysis'),
     path('api/', api_view, name='api'),
     path('batch-evaluations/', batch_evaluations_view, name='batch_evaluations'),
@@ -58,4 +59,7 @@ urlpatterns = [
 
     path('model/pull/', pull_model, name='pull_model'),
     path('', home_view, name='home'),
+
+
+
 ]

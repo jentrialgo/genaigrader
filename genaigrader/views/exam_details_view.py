@@ -1,10 +1,10 @@
 from django.http import JsonResponse
 from django.shortcuts import render, get_object_or_404
 from django.contrib.auth.decorators import login_required
-from genaigrader.models import Exam, Evaluation
+from genaigrader.models import Exam, Evaluation, Question
 from django.views.decorators.http import require_http_methods
 from genaigrader.services.graphics_service import process_evaluations_for_graphics, compute_model_statistics
-
+from genaigrader.services.question_analytics_service import calculate_question_analytics
 @login_required
 def exam_detail(request, exam_id):
     exam = get_object_or_404(
@@ -44,3 +44,13 @@ def delete_evaluation(request, eval_id):
         return JsonResponse({'status': 'success'})
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+
+@login_required
+@require_http_methods(["GET"])
+def question_analytics(request, question_id):
+    try:
+        question = Question.objects.get(id=question_id)
+        stats = calculate_question_analytics(question)
+        return JsonResponse({'success': True, 'data': stats})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=400)
