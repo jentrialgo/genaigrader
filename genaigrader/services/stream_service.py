@@ -31,8 +31,8 @@ def stream_responses(questions, user_prompt, llm, total_questions, exam, notes=N
 
     evaluation = Evaluation(
         prompt=(
-            user_prompt +
-            " Te voy a pasar una pregunta de test y tienes que responderme con qué opción es la correcta. "
+            (f"{user_prompt}\n\n" if user_prompt else "") +
+            "Te voy a pasar una pregunta de test y tienes que responderme con qué opción es la correcta. "
             "Sólo debes decirme la opción, por ejemplo 'a', absolutamente nada más.\n"
         ),
         ev_date=timezone.now(),
@@ -43,7 +43,6 @@ def stream_responses(questions, user_prompt, llm, total_questions, exam, notes=N
         ollama_version=get_evaluation_ollama_version(llm.model_obj),
         notes=notes
     )
-
     for index, question in enumerate(questions):
         start_time = time.monotonic()
 

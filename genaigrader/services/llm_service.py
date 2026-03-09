@@ -10,10 +10,10 @@ def generate_prompt(question, user_prompt):
     - dict with full prompt and separated components.
     """
     prompt = ""
-    user_prompt_part = user_prompt or ""
+    user_prompt_part = f"{user_prompt}\n\n" if user_prompt else ""
     
     user_prompt_part += (
-        "\n\nTe voy a pasar una pregunta de test y tienes que responderme con qué opción es la correcta. "
+        "Te voy a pasar una pregunta de test y tienes que responderme con qué opción es la correcta. "
         "Sólo debes decirme la opción, por ejemplo 'a', absolutamente nada más.\n"
     )
 
