@@ -46,8 +46,7 @@ def delete_evaluation(request, eval_id):
         return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
 
 
-#TODO CAMBIAR CODIGOS DE ERROR
-#@login_required
+@login_required
 @require_http_methods(["GET"])
 def question_analytics(request, question_id):
     try:
