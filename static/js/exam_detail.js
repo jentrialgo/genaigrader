@@ -220,7 +220,6 @@ document.addEventListener('DOMContentLoaded', function () {
 function loadQuestionAnalytics(questionId) {
     const tbody = document.getElementById(`analyticsBody--${questionId}`);
     const table = document.getElementById(`questionAnalyticsTable--${questionId}`);
-    console.log("🚀 ¡Botón pulsado! Intentando cargar la pregunta:", questionId);
     tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Cargando datos...</td></tr>';
     table.style.display = 'table';
 
