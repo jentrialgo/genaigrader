@@ -2,12 +2,13 @@ from django.test import TestCase
 
 from django.core.files.uploadedfile import SimpleUploadedFile
 from unittest.mock import patch
-from genaigrader.models import Course, Exam, Question
+from genaigrader.models import Course, Exam, Question, Model
 from genaigrader.services.exam_service import process_exam_file
+from genaigrader.services.upload_file_service import handle_file_upload
 from genaigrader.views.evaluate_views import upload_file
 from django.test.client import RequestFactory
 from django.contrib.auth.models import User
-
+from django.utils import timezone
 VALID_EXAM_FILE_CONTENT = """
 What's the PATH?
 a) A special file.
@@ -140,6 +141,20 @@ class UploadFileTestCase(TestCase):
         """This test case checks the behavior when an empty exam file is uploaded.
         It should return a 400 status code and not create any exam or questions."""
         self.__test_updload_file_invalid_exam_file("")
+
+    @patch("genaigrader.services.upload_file_service.is_unique_exam")
+    def test_duplicate_exam_evaluation_returns_409(self, mock_is_unique):
+        """This test verifies that uploading the exact same exam for the same model
+        returns a 409 Conflict status code and prevents duplication."""
+        mock_is_unique.return_value = False
+
+        request = self._mock_request(file_content=VALID_EXAM_FILE_CONTENT.encode())
+        from genaigrader.services.upload_file_service import handle_file_upload
+        response = handle_file_upload(request)
+
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(Exam.objects.count(), 0)
+
 
 class TestExamService(TestCase):
     def test_invalid_exam_file_no_options(self):

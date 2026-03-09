@@ -13,6 +13,7 @@ $(document).ready(function () {
   toggleCourseInputs();
   $('input[name="course_choice"]').change(toggleCourseInputs);
 
+  // Handle form submission
   $("#exam-form").submit(function (event) {
     event.preventDefault();
 
@@ -25,6 +26,7 @@ $(document).ready(function () {
     resetUI();
     const formData = new FormData(this);
 
+    //Calls the backend (urls.py) to process the file and stream the results back
     fetch("/upload/", {
       method: "POST",
       body: formData,
@@ -32,14 +34,24 @@ $(document).ready(function () {
     })
       .then((response) => {
         if (!response.ok) {
-          return handleErrorResponse(response, "There was an error processing the file.");
+          //Code that handles in case the exam is already in the BD and has been processed with the same model
+          if(response.status === 409){
+             //We use a promise that will resolve with the text content of the error.
+             return response.text().then((ErrorText) => {
+               throw new Error(ErrorText);
+               });
+          }else{
+            return handleErrorResponse(response, "There was an error processing the file.");
+          }
+
         }
         return handleStreamingResponse(response, updateUI);
       })
       .catch((error) => {
         console.error("Error:", error);
         $("#loading-indicator").hide();
-        $("#exam-results").html("Error processing the file.");
+        errorMessage = error.message ? error.message : "Error processing the file.";
+        $("#exam-results").html(errorMessage);
       });
   });
 });
