@@ -45,6 +45,8 @@ def delete_evaluation(request, eval_id):
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
 
+
+#TODO CAMBIAR CODIGOS DE ERROR
 #@login_required
 @require_http_methods(["GET"])
 def question_analytics(request, question_id):
@@ -52,5 +54,7 @@ def question_analytics(request, question_id):
         question = Question.objects.get(id=question_id)
         stats = calculate_question_analytics(question)
         return JsonResponse({'success': True, 'data': stats})
+    except Question.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Question not found'}, status=404)
     except Exception as e:
-        return JsonResponse({'success': False, 'error': str(e)}, status=400)
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
