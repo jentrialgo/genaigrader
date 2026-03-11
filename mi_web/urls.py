@@ -37,6 +37,8 @@ urlpatterns = [
  
     path('evaluate/', evaluate_view, name='evaluate'),
     path('course/', course_view, name='course'),
+
+    #This is the URL that the frontend will call to upload the exam file. It is handled by the upload_file view which processes the file and creates the necessary database entries.
     path('upload/', upload_file, name='upload_file'),
     path('exam/<int:exam_id>/', exam_detail, name='exam_detail'),
     path('analysis/', analysis_view, name='analysis'),
