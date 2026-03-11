@@ -12,7 +12,6 @@
 {% block content %}
   <h2>Exams</h2>
   <form id="exam-form">
-    <!-- Course selection -->
     <div id="course-selection">
       <div>
         <input type="radio" name="course_choice" id="existing-course" value="existing" checked>
@@ -26,18 +25,17 @@
       <div>
         <input type="radio" name="course_choice" id="new-course-radio" value="new">
         <label for="new-course-radio">New course:</label>
-        <input type="text" id="new-course-input" name="new_course" placeholder="Name of new course" style="display: none;">
+        <input type="text" id="new-course-input" name="new_course" placeholder="Name of new course" class="is-hidden">
       </div>
     </div>
 
     {% include "partials/model_select.html" %}
 
-    <!-- File upload -->
     <input type="file" name="file" accept=".txt" required />
 
-    <!-- Optional fields -->
     <textarea id="user-prompt" name="user_prompt" placeholder="Write your prompt... (optional)" class="eval-user-prompt-fullwidth" rows="3"></textarea>
-    <input type="text" id="user-exam" name="user_exam" placeholder="Exam name (optional)..."/>
+    <input type="text" id="user-exam" name="user_exam" placeholder="Exam name (optional)..." aria-describedby="user-exam-error"/>
+    <div id="user-exam-error" class="field-error" role="alert" aria-live="polite"></div>
     <textarea id="notes" name="notes" placeholder="Notes for this evaluation... (e.g., exam difficulty, hardware used)" class="eval-user-prompt-fullwidth" rows="2"></textarea>
 
     <button type="submit">Upload File</button>

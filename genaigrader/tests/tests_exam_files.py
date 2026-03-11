@@ -1,3 +1,5 @@
+import json
+
 from django.test import TestCase
 
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -51,21 +53,25 @@ class UploadFileTestCase(TestCase):
     def setUp(self):
         self.factory = RequestFactory()
         self.user = self._create_user()
+        self.course = Course.objects.create(name="Test Course", user=self.user)
 
     def _create_user(self):
         return User.objects.create_user(username="testuser", password="password")
 
-    def _mock_request(self, file_content):
+    def _mock_request(self, file_content, file_name="test.txt", **extra_post_data):
         """Create a mock request with the necessary parameters."""
+        post_data = {
+            "course_choice": "existing",
+            "course_id": str(self.course.id),
+            "model": "Test Model",
+        }
+        post_data.update(extra_post_data)
+
         request = self.factory.post(
             "/upload_file/",
-            {
-                "course_choice": "new",
-                "new_course": "Test Course",
-                "model": "Test Model",
-            },
+            post_data,
         )
-        uploaded_file = SimpleUploadedFile("test.txt", file_content)
+        uploaded_file = SimpleUploadedFile(file_name, file_content)
         request.FILES["file"] = uploaded_file
 
         request.user = self.user
@@ -140,6 +146,65 @@ class UploadFileTestCase(TestCase):
         """This test case checks the behavior when an empty exam file is uploaded.
         It should return a 400 status code and not create any exam or questions."""
         self.__test_updload_file_invalid_exam_file("")
+
+    def test_upload_blocks_duplicate_exam_name_from_file_name(self):
+        """Uploading with an existing exam name in the same course returns 409 and avoids duplicates."""
+        existing_exam = Exam.objects.create(description="test.txt", course=self.course, user=self.user)
+
+        request = self._mock_request(file_content=VALID_EXAM_FILE_CONTENT.encode(), file_name="test.txt")
+        response = upload_file(request)
+
+        self.assertEqual(response.status_code, 409)
+        payload = json.loads(response.content)
+        self.assertEqual(payload["error"], "duplicate_exam")
+        self.assertEqual(payload["existing_exam_id"], existing_exam.id)
+        self.assertEqual(payload["exam_name"], "test.txt")
+        self.assertEqual(payload["course_name"], self.course.name)
+        self.assertEqual(payload["message"], "An exam with this name already exists in this course.")
+        self.assertEqual(Exam.objects.count(), 1)
+        self.assertEqual(Question.objects.count(), 0)
+
+    def test_upload_blocks_duplicate_exam_name_from_user_exam(self):
+        """The user_exam field has priority over file name when checking for conflicts."""
+        existing_exam = Exam.objects.create(description="Midterm 1", course=self.course, user=self.user)
+
+        request = self._mock_request(
+            file_content=VALID_EXAM_FILE_CONTENT.encode(),
+            file_name="another_file.txt",
+            user_exam="Midterm 1",
+        )
+        response = upload_file(request)
+
+        self.assertEqual(response.status_code, 409)
+        payload = json.loads(response.content)
+        self.assertEqual(payload["error"], "duplicate_exam")
+        self.assertEqual(payload["existing_exam_id"], existing_exam.id)
+        self.assertEqual(payload["exam_name"], "Midterm 1")
+        self.assertEqual(payload["course_name"], self.course.name)
+        self.assertEqual(payload["message"], "An exam with this name already exists in this course.")
+        self.assertEqual(Exam.objects.count(), 1)
+        self.assertEqual(Question.objects.count(), 0)
+
+    def test_upload_allows_same_exam_name_in_different_course(self):
+        """Exam names are unique per course, so same name in another course is allowed."""
+        other_course = Course.objects.create(name="Other Course", user=self.user)
+        Exam.objects.create(description="test.txt", course=self.course, user=self.user)
+
+        request = self.factory.post(
+            "/upload_file/",
+            {
+                "course_choice": "existing",
+                "course_id": str(other_course.id),
+                "model": "Test Model",
+            },
+        )
+        request.FILES["file"] = SimpleUploadedFile("test.txt", VALID_EXAM_FILE_CONTENT.encode())
+        request.user = self.user
+
+        response = upload_file(request)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(Exam.objects.filter(description="test.txt").count(), 2)
 
 class TestExamService(TestCase):
     def test_invalid_exam_file_no_options(self):

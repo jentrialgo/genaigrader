@@ -1,14 +1,14 @@
-/* exam.css - Tema Oscuro Azul */
+/* Tema Oscuro Azul */
 :root {
-  --primary-color: #3b82f6;       /* Azul brillante principal */
-  --secondary-color: #1e3a8a;     /* Azul oscuro para contrastes */
-  --success-color: #22c55e;       /* Verde para éxito */
-  --error-color: #ef4444;         /* Rojo para errores */
-  --background-dark: #0f172a;     /* Fondo oscuro principal */
-  --background-medium: #1e293b;   /* Fondo intermedio */
-  --text-color: #f8fafc;          /* Texto principal claro */
-  --text-light: #94a3b8;          /* Texto secundario */
-  --border-color: #334155;        /* Color de bordes */
+  --primary-color: #3b82f6;
+  --secondary-color: #1e3a8a;
+  --success-color: #22c55e;
+  --error-color: #ef4444;
+  --background-dark: #0f172a;
+  --background-medium: #1e293b;
+  --text-color: #f8fafc;
+  --text-light: #94a3b8;
+  --border-color: #334155;
 }
 
 body {
@@ -33,7 +33,7 @@ h2 {
   padding: 2rem;
   background: var(--background-medium);
   border-radius: 12px;
-  box-shadow: var(--shadow-md);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
   border: 1px solid var(--border-color);
 }
 
@@ -50,7 +50,6 @@ h2 {
   padding: 1rem;
   background: var(--background-dark);
   border-radius: 8px;
-  transition: all 0.2s ease;
   border: 1px solid var(--border-color);
 }
 
@@ -72,7 +71,6 @@ select, input[type="text"], input[type="file"] {
   border: 2px solid var(--border-color);
   border-radius: 8px;
   font-size: 1rem;
-  transition: var(--transition);
   background: var(--background-dark);
   color: var(--text-color);
 }
@@ -106,7 +104,6 @@ input[type="file"]::file-selector-button {
   border: none;
   border-radius: 6px;
   cursor: pointer;
-  transition: var(--transition);
 }
 
 input[type="file"]::file-selector-button:hover {
@@ -118,14 +115,12 @@ input[type="file"]::file-selector-button:hover {
   padding: 1rem;
   background: var(--primary-color);
   color: var(--text-color);
-  border: none;
   border-radius: 8px;
   font-size: 1rem;
   font-weight: 600;
   cursor: pointer;
-  transition: var(--transition);
   margin: 1.5rem 0;
-  border: 2px solid transparent;
+  border: none;
 }
 
 #exam-form button[type="submit"]:hover {
@@ -140,7 +135,7 @@ input[type="file"]::file-selector-button:hover {
   padding: 2rem;
   background: var(--background-medium);
   border-radius: 12px;
-  box-shadow: var(--shadow-md);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
   border: 1px solid var(--border-color);
 }
 
@@ -160,19 +155,15 @@ input[type="file"]::file-selector-button:hover {
 
 #progress-bar {
   height: 1rem;
-  transition: width 0.5s ease;
 }
 
 #exam-results {
-  max-width: 800px;
+  max-width: 860px;
   margin: 2rem auto;
-  padding: 2rem;
-  background: var(--background-medium);
-  border-radius: 12px;
-  box-shadow: var(--shadow-md);
-  font-weight: 500;
-  text-align: center;
-  border: 1px solid var(--border-color);
+  padding: 0;
+  background: transparent;
+  border: none;
+  text-align: left;
 }
 
 #exam-details {
@@ -180,12 +171,103 @@ input[type="file"]::file-selector-button:hover {
   margin: 2rem auto;
 }
 
+.is-hidden {
+  display: none;
+}
+
+#user-exam.is-invalid {
+  border-color: var(--error-color);
+  background-color: #2a1116;
+  color: #fee2e2;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.28);
+}
+
+#user-exam.is-invalid:focus {
+  border-color: var(--error-color);
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.35);
+}
+
+#user-exam.is-invalid-highlight {
+  animation: examInputErrorPulse 0.85s ease-in-out 2;
+}
+
+@keyframes examInputErrorPulse {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.45);
+  }
+  50% {
+    transform: scale(1.01);
+    box-shadow: 0 0 0 6px rgba(239, 68, 68, 0.18);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+  }
+}
+
+.field-error {
+  display: none;
+  margin: 0.5rem 0 0;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid rgba(239, 68, 68, 0.5);
+  border-radius: 8px;
+  background: rgba(127, 29, 29, 0.2);
+  color: #fca5a5;
+  font-size: 0.92rem;
+}
+
+.field-error.is-visible {
+  display: block;
+}
+
+.field-error-title {
+  margin: 0;
+  color: #fecaca;
+  font-weight: 600;
+}
+
+.field-error-context {
+  margin: 0.5rem 0 0;
+  color: #fca5a5;
+}
+
+.field-error-list {
+  margin: 0.6rem 0 0;
+  padding-left: 1.2rem;
+}
+
+.field-error-list li {
+  margin: 0.35rem 0;
+}
+
+.field-error-links {
+  display: flex;
+  gap: 0.9rem;
+  margin-top: 0.7rem;
+}
+
+.field-error-links a {
+  color: #93c5fd;
+  text-decoration: underline;
+}
+
+.field-error-links a:hover {
+  color: #bfdbfe;
+}
+
+.error-message {
+  color: #fca5a5;
+  text-align: center;
+  margin-top: 1.25rem;
+}
+
 #exam-details > div {
   margin: 1.5rem 0;
   padding: 1.5rem;
   background: var(--background-medium);
   border-radius: 12px;
-  box-shadow: var(--shadow-sm);
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   border: 1px solid var(--border-color);
 }
 
@@ -201,14 +283,186 @@ pre {
   border: 1px solid var(--border-color);
 }
 
-@media (max-width: 768px) {
-  #exam-form, #loading-indicator, #exam-results, #exam-details {
-      margin: 1rem;
-      padding: 1rem;
-  }
-  
-  #course-selection > div {
-      flex-direction: column;
-      align-items: flex-start;
-  }
+/* UPLOAD WARNING - DESKTOP ONLY */
+.upload-warning-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 1rem 0;
+  animation: fadeIn 0.3s ease-in-out;
 }
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.warning-card {
+  background-color: var(--background-medium);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 32px;
+  max-width: 550px;
+  width: 100%;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+}
+
+.warning-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.warning-header .icon {
+  font-size: 28px;
+  flex-shrink: 0;
+}
+
+.warning-header h2 {
+  color: #f59e0b;
+  margin: 0;
+  font-size: 24px;
+  text-align: left;
+  text-shadow: none;
+}
+
+.main-message {
+  font-size: 16px;
+  line-height: 1.5;
+  margin-bottom: 24px;
+  color: var(--text-color);
+}
+
+.details-box {
+  background-color: var(--background-dark);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 24px;
+}
+
+.detail-row {
+  display: flex;
+  margin-bottom: 8px;
+}
+
+.detail-row:last-child {
+  margin-bottom: 0;
+}
+
+.detail-label {
+  width: 100px;
+  color: var(--text-light);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.detail-value {
+  color: #60a5fa;
+  font-family: monospace;
+  font-size: 15px;
+  word-break: break-all;
+  margin-left: 1rem;
+}
+
+.action-info h3 {
+  font-size: 14px;
+  text-transform: uppercase;
+  color: var(--text-light);
+  letter-spacing: 0.5px;
+  margin: 0 0 12px 0;
+}
+
+.action-info ul {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 32px 0;
+}
+
+.action-info li {
+  background: rgba(255, 255, 255, 0.03);
+  border-left: 3px solid var(--primary-color);
+  padding: 12px 16px;
+  margin-bottom: 8px;
+  border-radius: 0 6px 6px 0;
+  font-size: 15px;
+}
+
+.button-group {
+  display: flex;
+  gap: 16px;
+}
+
+.button-group a {
+  text-decoration: none;
+  padding: 12px 20px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 15px;
+  text-align: center;
+  flex: 1;
+  min-width: 200px;
+}
+
+.btn-primary {
+  background-color: var(--primary-color);
+  color: white !important;
+  border: 1px solid var(--primary-color);
+}
+
+.btn-primary:hover {
+  background-color: var(--secondary-color);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.btn-secondary {
+  background-color: transparent;
+  color: var(--text-color) !important;
+  border: 1px solid var(--border-color);
+}
+
+.btn-secondary:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+  border-color: var(--text-light);
+}
+
+.instructions-box {
+  background-color: rgba(96, 165, 250, 0.1);
+  border: 1px solid rgba(96, 165, 250, 0.3);
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.instructions-box h3 {
+  color: #60a5fa;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 0 0 16px 0;
+  font-weight: 600;
+}
+
+.instruction-item {
+  margin-bottom: 16px;
+}
+
+.instruction-item:last-child {
+  margin-bottom: 0;
+}
+
+.instruction-item h4 {
+  color: var(--text-color);
+  margin: 0 0 8px 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.instruction-item p {
+  color: var(--text-light);
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+}
+

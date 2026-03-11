@@ -2,9 +2,14 @@ from typing import List, Dict
 from ..models import Exam
 import re
 
-def create_exam(uploaded_file, course, user, request):
+
+def resolve_exam_name(uploaded_file, request):
+    """Resolve exam name using user input first, falling back to uploaded file name."""
     exam_name = request.POST.get("user_exam", "").strip()
-    description = exam_name if exam_name else uploaded_file.name
+    return exam_name if exam_name else uploaded_file.name
+
+def create_exam(uploaded_file, course, user, request):
+    description = resolve_exam_name(uploaded_file, request)
     return Exam(
         description=description,
         course=course,
