@@ -10,7 +10,7 @@
   --border-color: #334155;
 }
 
-/* Estilos generales y formulario de descarga */
+/* General styles and download form */
 h2 {
   font-family: 'Segoe UI', system-ui, sans-serif;
   font-size: 2.2rem;
@@ -82,7 +82,7 @@ h2::before {
   transition: all 0.3s ease;
 }
 
-/* Formulario creación modelos externos */
+/* External model creation form */
 #show-form {
   background-color: var(--success-color);
   color: var(--text-color);
@@ -147,7 +147,7 @@ h2::before {
   transform: translateY(-2px);
 }
 
-/* Estilos de la tabla */
+/* Table styles */
 #model-table {
   width: 100%;
   border-collapse: collapse;
@@ -172,7 +172,7 @@ h2::before {
   font-weight: 600;
 }
 
-/* Secciones locales/externos */
+/* Local/external sections */
 .section-header td {
   background: var(--secondary-color) !important;
   padding: 0.5rem 1rem !important;
@@ -204,7 +204,15 @@ h2::before {
   font-style: italic;
 }
 
-/* Mensajes de estado */
+/* Status messages */
+
+.api-creation-form-spacing {
+  margin: 20px 0;
+}
+
+.is-hidden {
+  display: none;
+}
 .message {
   padding: 1rem;
   border-radius: 8px;
@@ -306,7 +314,7 @@ h2::before {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
-/* Animaciones */
+/* Animations */
 @keyframes slideDown {
   from {
     opacity: 0;
