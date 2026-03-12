@@ -13,3 +13,24 @@ dependencies = [
     "requests>=2.32.3",
     "whitenoise>=6.9.0",
 ]
+
+[dependency-groups]
+dev = [
+    "black>=24.10.0",
+    "isort>=5.13.2",
+    "pre-commit>=4.0.1",
+    "ruff>=0.8.4",
+]
+
+[tool.black]
+line-length = 88
+
+[tool.isort]
+profile = "black"
+
+[tool.ruff]
+line-length = 88
+
+[tool.ruff.lint.per-file-ignores]
+"mi_web/settings_ngrok.py" = ["F403", "F405"]
+
