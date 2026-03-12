@@ -9,7 +9,6 @@ import json
 import requests
 from genaigrader.services.get_models_service import get_models_for_user
 
-
 OLLAMA_BASE_URL = "http://localhost:11434"
 
 @login_required

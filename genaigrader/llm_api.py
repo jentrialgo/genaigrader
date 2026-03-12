@@ -17,7 +17,7 @@ class LlmApi:
             - api_key (str, optional): Required if is_external=True. The authentication token for the external API.
         """
         self.model_obj = model_obj
-        self.client = None  # Inicializamos el cliente como None
+        self.client = None  # Initialize client lazily after successful validation.
 
     def validate(self):
         """
@@ -43,16 +43,16 @@ class LlmApi:
             if not self.model_obj.api_key:
                 errors.append("API key is required for external models")
 
-            # Validamos la conectividad y autenticación del modelo externo
+            # Validate connectivity and authentication for external models.
             if not errors:
                 try:
-                    # Creamos el cliente solo si no hay errores
+                    # Create the client only when basic validation passes.
                     self.client = openai.OpenAI(
                         api_key=self.model_obj.api_key,
                         base_url=self.model_obj.api_url
                     )
-                    # Realizamos una prueba de conectividad
-                    self.client.models.list()  # Conexión a la API externa
+                    # Perform a connectivity test request.
+                    self.client.models.list()  # External API connectivity test.
                 except openai.AuthenticationError:
                     errors.append("Invalid or unauthorized API key")
                 except openai.APIConnectionError:
