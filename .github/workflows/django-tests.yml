@@ -11,26 +11,26 @@ jobs:
       MANAGE_PY_PATH: manage.py
 
     steps:
-      # Paso 1: Clonar el repositorio
+      # Step 1: Checkout repository
       - uses: actions/checkout@v3
 
-      # Paso 2: Configurar Python
+      # Step 2: Configure Python
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
 
-      # Paso 3: Instalar uv
+      # Step 3: Install uv
       - name: Install uv
         run: |
           curl -LsSf https://astral.sh/uv/install.sh | sh
 
-      # Paso 4: Ejecutar migraciones (sin necesidad de instalar dependencias manualmente)
+      # Step 4: Run migrations
       - name: Run Django migrations
         run: |
           ~/.local/bin/uv run python manage.py migrate
 
-      # Paso 5: Ejecutar las pruebas
+      # Step 5: Run tests
       - name: Run Django tests
         run: |
           ~/.local/bin/uv run python manage.py test

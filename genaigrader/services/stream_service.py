@@ -3,7 +3,7 @@ import logging
 import time
 from django.db import transaction
 from django.utils import timezone
-from genaigrader.models import Evaluation, QuestionEvaluation
+from genaigrader.models import Evaluation, QuestionEvaluation, QuestionOption
 from genaigrader.services.llm_service import generate_prompt
 from genaigrader.services.ollama_version_service import get_evaluation_ollama_version
 
@@ -123,9 +123,16 @@ def process_question(correct_count, index, question, user_prompt, llm, total_que
 
     is_correct = (response == question.correct_option.content.strip().lower()[0])
 
+    selected_option = None
+    if response:
+        selected_option = QuestionOption.objects.filter(
+            question=question,
+            content__istartswith=response
+        ).first()
+
     question_eval = QuestionEvaluation(
         question=question,
-        question_option=question.correct_option
+        question_option=selected_option
     )
     question_evaluations.append(question_eval)
 

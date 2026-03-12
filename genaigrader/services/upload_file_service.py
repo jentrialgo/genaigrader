@@ -65,6 +65,7 @@ def handle_file_upload(request):
     """Main entrypoint to process an upload_file view POST request."""
     if request.method != 'POST':
         return HttpResponse("Method not allowed", status=405)
+
     try:
         # Step 1: initial validations
         course = get_or_create_course(request)

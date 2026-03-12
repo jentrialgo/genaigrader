@@ -1,4 +1,4 @@
-/* Tema Oscuro Azul */
+/* Dark blue theme */
 :root {
   --primary-color: #3b82f6;
   --secondary-color: #1e3a8a;
@@ -139,6 +139,33 @@ input[type="file"]::file-selector-button:hover {
   border: 1px solid var(--border-color);
 }
 
+.loading-indicator-hidden {
+  display: none;
+}
+
+.loading-indicator-centered {
+  text-align: center;
+}
+
+.loading-progress-track {
+  width: 100%;
+  background-color: #eee;
+  border-radius: 12px;
+  margin-top: 1rem;
+}
+
+.loading-progress-bar {
+  width: 0%;
+  height: 24px;
+  background-color: #4caf50;
+  border-radius: 10px;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: width 0.5s ease;
+}
+
 .loading-spinner {
   width: 50px;
   height: 50px;
@@ -241,21 +268,6 @@ input[type="file"]::file-selector-button:hover {
   margin: 0.35rem 0;
 }
 
-.field-error-links {
-  display: flex;
-  gap: 0.9rem;
-  margin-top: 0.7rem;
-}
-
-.field-error-links a {
-  color: #93c5fd;
-  text-decoration: underline;
-}
-
-.field-error-links a:hover {
-  color: #bfdbfe;
-}
-
 .error-message {
   color: #fca5a5;
   text-align: center;
@@ -281,188 +293,5 @@ pre {
   margin: 1rem 0;
   color: var(--text-color);
   border: 1px solid var(--border-color);
-}
-
-/* UPLOAD WARNING - DESKTOP ONLY */
-.upload-warning-wrapper {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding: 1rem 0;
-  animation: fadeIn 0.3s ease-in-out;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(-10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.warning-card {
-  background-color: var(--background-medium);
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
-  padding: 32px;
-  max-width: 550px;
-  width: 100%;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
-}
-
-.warning-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-.warning-header .icon {
-  font-size: 28px;
-  flex-shrink: 0;
-}
-
-.warning-header h2 {
-  color: #f59e0b;
-  margin: 0;
-  font-size: 24px;
-  text-align: left;
-  text-shadow: none;
-}
-
-.main-message {
-  font-size: 16px;
-  line-height: 1.5;
-  margin-bottom: 24px;
-  color: var(--text-color);
-}
-
-.details-box {
-  background-color: var(--background-dark);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  border-radius: 8px;
-  padding: 16px;
-  margin-bottom: 24px;
-}
-
-.detail-row {
-  display: flex;
-  margin-bottom: 8px;
-}
-
-.detail-row:last-child {
-  margin-bottom: 0;
-}
-
-.detail-label {
-  width: 100px;
-  color: var(--text-light);
-  font-weight: 600;
-  flex-shrink: 0;
-}
-
-.detail-value {
-  color: #60a5fa;
-  font-family: monospace;
-  font-size: 15px;
-  word-break: break-all;
-  margin-left: 1rem;
-}
-
-.action-info h3 {
-  font-size: 14px;
-  text-transform: uppercase;
-  color: var(--text-light);
-  letter-spacing: 0.5px;
-  margin: 0 0 12px 0;
-}
-
-.action-info ul {
-  list-style: none;
-  padding: 0;
-  margin: 0 0 32px 0;
-}
-
-.action-info li {
-  background: rgba(255, 255, 255, 0.03);
-  border-left: 3px solid var(--primary-color);
-  padding: 12px 16px;
-  margin-bottom: 8px;
-  border-radius: 0 6px 6px 0;
-  font-size: 15px;
-}
-
-.button-group {
-  display: flex;
-  gap: 16px;
-}
-
-.button-group a {
-  text-decoration: none;
-  padding: 12px 20px;
-  border-radius: 8px;
-  font-weight: 600;
-  font-size: 15px;
-  text-align: center;
-  flex: 1;
-  min-width: 200px;
-}
-
-.btn-primary {
-  background-color: var(--primary-color);
-  color: white !important;
-  border: 1px solid var(--primary-color);
-}
-
-.btn-primary:hover {
-  background-color: var(--secondary-color);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
-}
-
-.btn-secondary {
-  background-color: transparent;
-  color: var(--text-color) !important;
-  border: 1px solid var(--border-color);
-}
-
-.btn-secondary:hover {
-  background-color: rgba(255, 255, 255, 0.05);
-  border-color: var(--text-light);
-}
-
-.instructions-box {
-  background-color: rgba(96, 165, 250, 0.1);
-  border: 1px solid rgba(96, 165, 250, 0.3);
-  border-radius: 8px;
-  padding: 16px;
-}
-
-.instructions-box h3 {
-  color: #60a5fa;
-  font-size: 14px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin: 0 0 16px 0;
-  font-weight: 600;
-}
-
-.instruction-item {
-  margin-bottom: 16px;
-}
-
-.instruction-item:last-child {
-  margin-bottom: 0;
-}
-
-.instruction-item h4 {
-  color: var(--text-color);
-  margin: 0 0 8px 0;
-  font-size: 15px;
-  font-weight: 600;
-}
-
-.instruction-item p {
-  color: var(--text-light);
-  margin: 0;
-  font-size: 14px;
-  line-height: 1.5;
 }
 
