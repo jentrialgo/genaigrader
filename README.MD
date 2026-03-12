@@ -110,6 +110,37 @@ uv run manage.py collectstatic
 ```powershell
 uv run manage.py runserver
 ```
+
+## Pre-commit Tutorial
+
+1. **Run one-time setup**
+   ```powershell
+   uv sync --group dev
+   uv run pre-commit install
+   ```
+
+2. **Run hooks for all files (first run)**
+   ```powershell
+   uv run pre-commit run --all-files
+   ```
+
+3. **Create a commit**
+   ```powershell
+   git add .
+   git commit -m "your message"
+   ```
+
+4. **If files were changed by hooks**
+   ```powershell
+   git add .
+   git commit -m "your message"
+   ```
+
+5. **Update hooks (optional)**
+   ```powershell
+   uv run pre-commit autoupdate
+   ```
+
 ## Usage
 
 1. Access the app at `http://localhost:8000/`.
