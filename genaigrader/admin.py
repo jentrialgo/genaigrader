@@ -55,7 +55,10 @@ class EvaluationAdmin(admin.ModelAdmin):
     search_fields = ('prompt', 'model__description',)
 
     def show_question_evaluations(self, obj):
-        return ", ".join([f"Q{qe.question.id} (O{qe.question_option.id})" for qe in obj.questionevaluation_set.all()])
+        return ", ".join([
+            f"Q{qe.question.id} (O{qe.question_option_id if qe.question_option_id is not None else 'None'})"
+            for qe in obj.questionevaluation_set.all()
+        ])
     show_question_evaluations.short_description = 'Evaluaciones de Preguntas'
 
     def show_model_description(self, obj):
@@ -69,5 +72,6 @@ class QuestionEvaluationAdmin(admin.ModelAdmin):
     search_fields = ('evaluation_id__id', 'question_id__id', 'question_option_id__id')  
 
     def show_related_info(self, obj):
-        return f"Evaluation: {obj.evaluation.prompt[:50]}, Question: {obj.question.statement[:50]}, Option: {obj.question_option.content}"
+        option_text = obj.question_option.content if obj.question_option else 'No matched option'
+        return f"Evaluation: {obj.evaluation.prompt[:50]}, Question: {obj.question.statement[:50]}, Option: {option_text}"
     show_related_info.short_description = 'Información Relacionada'

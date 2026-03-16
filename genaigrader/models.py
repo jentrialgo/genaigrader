@@ -127,7 +127,8 @@ class QuestionEvaluation(models.Model):
     id = models.AutoField(primary_key=True)
     evaluation = models.ForeignKey(Evaluation, on_delete=models.CASCADE)
     question = models.ForeignKey(Question, on_delete=models.CASCADE)
-    question_option = models.ForeignKey(QuestionOption, on_delete=models.CASCADE)
+    question_option = models.ForeignKey(QuestionOption, on_delete=models.CASCADE, null=True, blank=True)
 
     def __str__(self):
-        return f"Evaluation {self.evaluation.id}, Question {self.question.id}, Option {self.question_option.id}"
+        option_id = self.question_option_id if self.question_option_id is not None else "None"
+        return f"Evaluation {self.evaluation.id}, Question {self.question.id}, Option {option_id}"
