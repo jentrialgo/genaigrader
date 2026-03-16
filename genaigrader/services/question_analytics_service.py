@@ -9,7 +9,7 @@ def calculate_question_analytics(question):
     - question: Question instance for which to calculate analytics.
 
     Returns:
-    - dict containing total evaluations, correct evaluations, and accuracy.
+    - list of dict with per-model totals and accuracy.
     """
     # Fetch all evaluations for this question with required relations.
     question_evaluations = QuestionEvaluation.objects.filter(
@@ -28,11 +28,22 @@ def calculate_question_analytics(question):
                 'model_id': model.id,
                 'model_name': model.description,
                 'correct': 0,
+                'invalid': 0,
                 'total': 0
             }
 
-        # Count whether the selected option matches the correct option.
-        is_correct = question_evaluation.question_option_id == question.correct_option.id
+        selected_option_id = question_evaluation.question_option_id
+        is_invalid = selected_option_id is None
+
+        if is_invalid:
+            models_data[model_key]['invalid'] += 1
+
+        is_correct = (
+            selected_option_id is not None and
+            question.correct_option_id is not None and
+            selected_option_id == question.correct_option_id
+        )
+
         models_data[model_key]['correct'] += int(is_correct)
         models_data[model_key]['total'] += 1
 
@@ -45,7 +56,8 @@ def calculate_question_analytics(question):
             'model_id': model_data['model_id'],
             'model_name': model_data['model_name'],
             'accuracy': round(accuracy, 2),
-            'total_evaluations': model_data['total']
+            'total_evaluations': model_data['total'],
+            'invalid_evaluations': model_data['invalid']
         })
 
     return results

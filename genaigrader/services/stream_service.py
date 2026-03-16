@@ -119,7 +119,8 @@ def process_question(correct_count, index, question, user_prompt, llm, total_que
         # and, therefore, it doesn't return any response.
         response = ""
     else:
-        response = llm_response_list[0].strip().lower()[0]
+        first_token = llm_response_list[0].strip().lower()
+        response = first_token[0] if first_token else ""
 
     is_correct = (response == question.correct_option.content.strip().lower()[0])
 
