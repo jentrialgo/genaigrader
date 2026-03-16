@@ -398,7 +398,7 @@ function renderQuestionAccuracyChart() {
     feedback.textContent = `Showing ${datasets.length} model(s) across ${labels.length} question(s).`;
 
     questionAnalyticsState.chart = new Chart(chartCanvas, {
-        type: 'line',
+        type: 'bar',
         data: { labels, datasets },
         options: {
             responsive: true,
