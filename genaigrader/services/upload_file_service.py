@@ -1,12 +1,18 @@
-from django.http import StreamingHttpResponse, HttpResponse, JsonResponse
 from django.db import transaction
-from genaigrader.models import Question, QuestionOption, Exam
-from genaigrader.services.file_service import save_uploaded_file
-from genaigrader.services.exam_service import process_exam_file, create_exam, resolve_exam_name
+from django.http import HttpResponse, JsonResponse, StreamingHttpResponse
+
+from genaigrader.llm_api import LlmApi
+from genaigrader.models import Exam, Question, QuestionOption
 from genaigrader.services.course_service import get_or_create_course
+from genaigrader.services.exam_service import (
+    create_exam,
+    process_exam_file,
+    resolve_exam_name,
+)
+from genaigrader.services.file_service import save_uploaded_file
 from genaigrader.services.model_service import get_or_create_model
 from genaigrader.services.stream_service import stream_responses
-from genaigrader.llm_api import LlmApi
+
 
 def validate_model(request):
     """Retrieve and validate LLM model from the request."""
@@ -30,24 +36,20 @@ def persist_exam_and_questions(uploaded_file, course, user, request, questions_d
         exam.save()
 
         for q_data in questions_data:
-            if len(q_data['options']) < 2:
+            if len(q_data["options"]) < 2:
                 raise ValueError(
                     f"Question '{q_data['statement'][:30]}...' has less than 2 options"
                 )
 
-            question = Question.objects.create(
-                statement=q_data['statement'],
-                exam=exam
-            )
+            question = Question.objects.create(statement=q_data["statement"], exam=exam)
 
             correct_option = None
-            for opt_content in q_data['options']:
+            for opt_content in q_data["options"]:
                 option = QuestionOption.objects.create(
-                    content=opt_content,
-                    question=question
+                    content=opt_content, question=question
                 )
-                letter = opt_content.split(')')[0].strip().lower()
-                if letter == q_data['correct_option']:
+                letter = opt_content.split(")")[0].strip().lower()
+                if letter == q_data["correct_option"]:
                     correct_option = option
 
             if not correct_option:
@@ -63,13 +65,13 @@ def persist_exam_and_questions(uploaded_file, course, user, request, questions_d
 
 def handle_file_upload(request):
     """Main entrypoint to process an upload_file view POST request."""
-    if request.method != 'POST':
+    if request.method != "POST":
         return HttpResponse("Method not allowed", status=405)
 
     try:
         # Step 1: initial validations
         course = get_or_create_course(request)
-        uploaded_file = request.FILES['file']
+        uploaded_file = request.FILES["file"]
         user = request.user
 
         # Step 2: model validation
@@ -98,17 +100,17 @@ def handle_file_upload(request):
         )
 
         # Step 6: stream LLM response
-        user_prompt = request.POST.get('user_prompt', '')
-        notes = request.POST.get('notes', '')
+        user_prompt = request.POST.get("user_prompt", "")
+        notes = request.POST.get("notes", "")
         stream = stream_responses(
             Question.objects.filter(exam=exam),
             user_prompt,
             llm,
             len(questions_data),
             exam,
-            notes
+            notes,
         )
-        return StreamingHttpResponse(stream, content_type='text/event-stream')
+        return StreamingHttpResponse(stream, content_type="text/event-stream")
 
     except Exception as e:
         return HttpResponse(f"Error: {str(e)}", status=400)
@@ -117,10 +119,8 @@ def handle_file_upload(request):
 def find_exam_name_conflict(uploaded_file, course, user, request):
     """Return an existing Exam when the resolved name already exists in the same course, else None."""
     exam_name = resolve_exam_name(uploaded_file, request)
-    return Exam.objects.select_related('course').filter(
-        description__iexact=exam_name,
-        course=course,
-        user=user
-    ).first()
-
-
+    return (
+        Exam.objects.select_related("course")
+        .filter(description__iexact=exam_name, course=course, user=user)
+        .first()
+    )

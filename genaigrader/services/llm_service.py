@@ -11,7 +11,7 @@ def generate_prompt(question, user_prompt):
     """
     prompt = ""
     user_prompt_part = f"{user_prompt}\n\n" if user_prompt else ""
-    
+
     user_prompt_part += (
         "Te voy a pasar una pregunta de test y tienes que responderme con qué opción es la correcta. "
         "Sólo debes decirme la opción, por ejemplo 'a', absolutamente nada más.\n"
@@ -19,13 +19,13 @@ def generate_prompt(question, user_prompt):
 
     question_prompt_part = question.statement + "\n"
 
-    for option in question.questionoption_set.all().order_by('content'):
+    for option in question.questionoption_set.all().order_by("content"):
         question_prompt_part += f"{option.content}\n"
 
     prompt = user_prompt_part + question_prompt_part
 
     return {
-        'prompt': prompt,
-        'user_prompt': user_prompt_part,
-        'question_prompt': question_prompt_part
+        "prompt": prompt,
+        "user_prompt": user_prompt_part,
+        "question_prompt": question_prompt_part,
     }

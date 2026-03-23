@@ -15,67 +15,126 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.CreateModel(
-            name='Course',
+            name="Course",
             fields=[
-                ('id', models.AutoField(primary_key=True, serialize=False)),
-                ('name', models.CharField(max_length=255)),
+                ("id", models.AutoField(primary_key=True, serialize=False)),
+                ("name", models.CharField(max_length=255)),
             ],
         ),
         migrations.CreateModel(
-            name='Model',
+            name="Model",
             fields=[
-                ('id', models.AutoField(primary_key=True, serialize=False)),
-                ('description', models.CharField(max_length=255)),
+                ("id", models.AutoField(primary_key=True, serialize=False)),
+                ("description", models.CharField(max_length=255)),
             ],
         ),
         migrations.CreateModel(
-            name='Exam',
+            name="Exam",
             fields=[
-                ('id', models.AutoField(primary_key=True, serialize=False)),
-                ('description', models.CharField(max_length=255)),
-                ('course', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='genaigrader.course')),
-                ('creator_username', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to=settings.AUTH_USER_MODEL)),
+                ("id", models.AutoField(primary_key=True, serialize=False)),
+                ("description", models.CharField(max_length=255)),
+                (
+                    "course",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="genaigrader.course",
+                    ),
+                ),
+                (
+                    "creator_username",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
         ),
         migrations.CreateModel(
-            name='Evaluation',
+            name="Evaluation",
             fields=[
-                ('id', models.AutoField(primary_key=True, serialize=False)),
-                ('prompt', models.TextField()),
-                ('ev_date', models.DateField()),
-                ('grade', models.FloatField()),
-                ('exam', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='genaigrader.exam')),
-                ('model', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='genaigrader.model')),
+                ("id", models.AutoField(primary_key=True, serialize=False)),
+                ("prompt", models.TextField()),
+                ("ev_date", models.DateField()),
+                ("grade", models.FloatField()),
+                (
+                    "exam",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="genaigrader.exam",
+                    ),
+                ),
+                (
+                    "model",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="genaigrader.model",
+                    ),
+                ),
             ],
         ),
         migrations.CreateModel(
-            name='Question',
+            name="Question",
             fields=[
-                ('id', models.AutoField(primary_key=True, serialize=False)),
-                ('statement', models.TextField()),
-                ('exam', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='genaigrader.exam')),
+                ("id", models.AutoField(primary_key=True, serialize=False)),
+                ("statement", models.TextField()),
+                (
+                    "exam",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="genaigrader.exam",
+                    ),
+                ),
             ],
         ),
         migrations.CreateModel(
-            name='QuestionOption',
+            name="QuestionOption",
             fields=[
-                ('id', models.AutoField(primary_key=True, serialize=False)),
-                ('content', models.CharField(max_length=255)),
-                ('question', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='genaigrader.question')),
+                ("id", models.AutoField(primary_key=True, serialize=False)),
+                ("content", models.CharField(max_length=255)),
+                (
+                    "question",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="genaigrader.question",
+                    ),
+                ),
             ],
         ),
         migrations.CreateModel(
-            name='QuestionEvaluation',
+            name="QuestionEvaluation",
             fields=[
-                ('id', models.AutoField(primary_key=True, serialize=False)),
-                ('evaluation', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='genaigrader.evaluation')),
-                ('question', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='genaigrader.question')),
-                ('question_option', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='genaigrader.questionoption')),
+                ("id", models.AutoField(primary_key=True, serialize=False)),
+                (
+                    "evaluation",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="genaigrader.evaluation",
+                    ),
+                ),
+                (
+                    "question",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="genaigrader.question",
+                    ),
+                ),
+                (
+                    "question_option",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="genaigrader.questionoption",
+                    ),
+                ),
             ],
         ),
         migrations.AddField(
-            model_name='question',
-            name='correct_option',
-            field=models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, related_name='correct_option_for', to='genaigrader.questionoption'),
+            model_name="question",
+            name="correct_option",
+            field=models.ForeignKey(
+                null=True,
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name="correct_option_for",
+                to="genaigrader.questionoption",
+            ),
         ),
     ]

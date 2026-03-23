@@ -1,7 +1,11 @@
 import unittest
 from unittest.mock import Mock, patch
-from genaigrader.llm_api import LlmApi
-from genaigrader.views.batch_evaluations_view import validate_exam, validate_model, extract_summary
+
+from genaigrader.views.batch_evaluations_view import (
+    extract_summary,
+    validate_exam,
+    validate_model,
+)
 
 
 class ValidateExamTestCase(unittest.TestCase):
@@ -11,7 +15,9 @@ class ValidateExamTestCase(unittest.TestCase):
         mock_exam = Mock()
         mock_questions = Mock()
         mock_questions.exists.return_value = True
-        mock_exam.question_set.prefetch_related.return_value.all.return_value = mock_questions
+        mock_exam.question_set.prefetch_related.return_value.all.return_value = (
+            mock_questions
+        )
 
         try:
             validate_exam(mock_exam)  # Should not raise
@@ -23,7 +29,9 @@ class ValidateExamTestCase(unittest.TestCase):
         mock_exam = Mock()
         mock_questions = Mock()
         mock_questions.exists.return_value = False
-        mock_exam.question_set.prefetch_related.return_value.all.return_value = mock_questions
+        mock_exam.question_set.prefetch_related.return_value.all.return_value = (
+            mock_questions
+        )
 
         with self.assertRaises(ValueError):
             validate_exam(mock_exam)
@@ -31,7 +39,7 @@ class ValidateExamTestCase(unittest.TestCase):
 
 class ValidateModelTestCase(unittest.TestCase):
 
-    @patch('genaigrader.views.batch_evaluations_view.LlmApi')
+    @patch("genaigrader.views.batch_evaluations_view.LlmApi")
     def test_validate_model_success(self, mock_llmapi_class):
         """Should return a valid LlmApi instance when validation passes."""
         mock_llm = Mock()
@@ -42,7 +50,7 @@ class ValidateModelTestCase(unittest.TestCase):
         result = validate_model(model)
         self.assertEqual(result, mock_llm)
 
-    @patch('genaigrader.views.batch_evaluations_view.LlmApi')
+    @patch("genaigrader.views.batch_evaluations_view.LlmApi")
     def test_validate_model_failure(self, mock_llmapi_class):
         """Should raise ValueError when model validation fails."""
         mock_llm = Mock()
@@ -60,15 +68,15 @@ class ExtractSummaryTestCase(unittest.TestCase):
         """Should extract correct_count, total_time, and total_questions from a valid response."""
         responses = [
             'data: {"some": "value"}\n\n',
-            'data: {"total_time": 3.14, "correct_count": 4, "total_questions": 5}\n\n'
+            'data: {"total_time": 3.14, "correct_count": 4, "total_questions": 5}\n\n',
         ]
         result = extract_summary(responses)
-        correct_summary = {'grade': '8.0 (4/5)', 'time': 3.14}
+        correct_summary = {"grade": "8.0 (4/5)", "time": 3.14}
         self.assertEqual(result, correct_summary)
 
     def test_extract_summary_invalid_json(self):
         """Should return None if a response is not valid JSON."""
-        responses = ['data: not a json string\n\n']
+        responses = ["data: not a json string\n\n"]
         result = extract_summary(responses)
         self.assertIsNone(result)
 
@@ -79,5 +87,5 @@ class ExtractSummaryTestCase(unittest.TestCase):
         self.assertIsNone(result)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

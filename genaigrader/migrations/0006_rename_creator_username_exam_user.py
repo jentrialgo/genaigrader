@@ -6,13 +6,13 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('genaigrader', '0005_model_api_key_model_api_url'),
+        ("genaigrader", "0005_model_api_key_model_api_url"),
     ]
 
     operations = [
         migrations.RenameField(
-            model_name='exam',
-            old_name='creator_username',
-            new_name='user',
+            model_name="exam",
+            old_name="creator_username",
+            new_name="user",
         ),
     ]

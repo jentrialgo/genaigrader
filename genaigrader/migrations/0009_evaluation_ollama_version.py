@@ -6,13 +6,18 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('genaigrader', '0008_alter_evaluation_ev_date'),
+        ("genaigrader", "0008_alter_evaluation_ev_date"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='evaluation',
-            name='ollama_version',
-            field=models.CharField(blank=True, help_text='Version of Ollama used (null for external models)', max_length=50, null=True),
+            model_name="evaluation",
+            name="ollama_version",
+            field=models.CharField(
+                blank=True,
+                help_text="Version of Ollama used (null for external models)",
+                max_length=50,
+                null=True,
+            ),
         ),
     ]

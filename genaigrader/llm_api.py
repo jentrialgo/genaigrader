@@ -1,7 +1,7 @@
 import ollama
 import openai
-from django.core.validators import URLValidator
 from django.core.exceptions import ValidationError
+from django.core.validators import URLValidator
 
 
 class LlmApi:
@@ -48,17 +48,20 @@ class LlmApi:
                 try:
                     # Create the client only when basic validation passes.
                     self.client = openai.OpenAI(
-                        api_key=self.model_obj.api_key,
-                        base_url=self.model_obj.api_url
+                        api_key=self.model_obj.api_key, base_url=self.model_obj.api_url
                     )
                     # Perform a connectivity test request.
                     self.client.models.list()  # External API connectivity test.
                 except openai.AuthenticationError:
                     errors.append("Invalid or unauthorized API key")
                 except openai.APIConnectionError:
-                    errors.append(f"Failed to connect to the API at {self.model_obj.api_url}")
+                    errors.append(
+                        f"Failed to connect to the API at {self.model_obj.api_url}"
+                    )
                 except openai.NotFoundError:
-                    errors.append(f"Model '{self.model_obj.description}' not found on the API")
+                    errors.append(
+                        f"Model '{self.model_obj.description}' not found on the API"
+                    )
                 except Exception as e:
                     errors.append(f"Error trying to validate model: {e}")
         if errors:
@@ -69,7 +72,8 @@ class LlmApi:
         Removes all <think>...</think> blocks from the text.
         """
         import re
-        return re.sub(r'<think>[\s\S]*?</think>', '', text)
+
+        return re.sub(r"<think>[\s\S]*?</think>", "", text)
 
     def _yield_thinking_aware(self, stream, get_content):
         """
@@ -85,7 +89,7 @@ class LlmApi:
                 continue
             if first_chunk:
                 first_chunk = False
-                if content.lstrip().startswith('<think>'):
+                if content.lstrip().startswith("<think>"):
                     buffering = True
                     buffer += content
                     continue  # Don't yield yet
@@ -97,12 +101,12 @@ class LlmApi:
                     continue
             if buffering:
                 buffer += content
-                end_tag = buffer.find('</think>')
+                end_tag = buffer.find("</think>")
                 if end_tag == -1:
                     # Still inside <think> block
                     continue
                 # Found </think>, yield only what comes after
-                after = buffer[end_tag + len('</think>'):]
+                after = buffer[end_tag + len("</think>") :]
                 for line in after.splitlines():
                     if line.strip():
                         yield line
@@ -123,20 +127,29 @@ class LlmApi:
 
         Yields:
         - str: A stream of response chunks from the model (partial content).
-        
+
         Raises:
         - ValueError: If connection/authentication/model errors occur.
         """
         if not self.client:
             # This should ideally be caught by validate() before this point.
-            raise ValueError("OpenAI client not initialized. Validation might have failed or was skipped.")
+            raise ValueError(
+                "OpenAI client not initialized. Validation might have failed or was skipped."
+            )
 
         response = self.client.chat.completions.create(
             model=self.model_obj.description,
             messages=[{"role": "user", "content": prompt}],
             stream=True,
         )
-        yield from self._yield_thinking_aware(response, lambda chunk: chunk.choices[0].delta.content if chunk.choices and chunk.choices[0].delta else None)
+        yield from self._yield_thinking_aware(
+            response,
+            lambda chunk: (
+                chunk.choices[0].delta.content
+                if chunk.choices and chunk.choices[0].delta
+                else None
+            ),
+        )
 
     def _use_local_model(self, prompt):
         """
@@ -147,7 +160,7 @@ class LlmApi:
 
         Yields:
         - str: A stream of response chunks from the local model.
-        
+
         Raises:
         - ValueError: If an error occurs during local model execution.
         """
@@ -156,7 +169,9 @@ class LlmApi:
             messages=[{"role": "user", "content": prompt}],
             stream=True,
         )
-        yield from self._yield_thinking_aware(response_stream, lambda chunk: chunk['message']['content'])
+        yield from self._yield_thinking_aware(
+            response_stream, lambda chunk: chunk["message"]["content"]
+        )
 
     def generate_response(self, prompt):
         """
@@ -167,7 +182,7 @@ class LlmApi:
 
         Yields:
         - str: A stream of generated text from the selected model.
-        
+
         Raises:
         - ValueError: If model validation fails (e.g., missing API key, invalid URL).
         - ollama.ResponseError: If an error occurs while calling the local model.
