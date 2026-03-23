@@ -14,7 +14,7 @@ def calculate_question_analytics(question):
     # Fetch all evaluations for this question with required relations.
     question_evaluations = QuestionEvaluation.objects.filter(
         question_id=question.id
-    ).select_related('evaluation__model', 'question_option')
+    ).select_related("evaluation__model", "question_option")
 
     models_data = {}
 
@@ -25,39 +25,45 @@ def calculate_question_analytics(question):
 
         if model_key not in models_data:
             models_data[model_key] = {
-                'model_id': model.id,
-                'model_name': model.description,
-                'correct': 0,
-                'invalid': 0,
-                'total': 0
+                "model_id": model.id,
+                "model_name": model.description,
+                "correct": 0,
+                "invalid": 0,
+                "total": 0,
             }
 
         selected_option_id = question_evaluation.question_option_id
         is_invalid = selected_option_id is None
 
         if is_invalid:
-            models_data[model_key]['invalid'] += 1
+            models_data[model_key]["invalid"] += 1
 
         is_correct = (
-            selected_option_id is not None and
-            question.correct_option_id is not None and
-            selected_option_id == question.correct_option_id
+            selected_option_id is not None
+            and question.correct_option_id is not None
+            and selected_option_id == question.correct_option_id
         )
 
-        models_data[model_key]['correct'] += int(is_correct)
-        models_data[model_key]['total'] += 1
+        models_data[model_key]["correct"] += int(is_correct)
+        models_data[model_key]["total"] += 1
 
     results = []
     # Build the final per-model analytics payload.
     for model_data in models_data.values():
-        accuracy = (model_data['correct'] / model_data['total'] * 100) if model_data['total'] > 0 else 0
+        accuracy = (
+            (model_data["correct"] / model_data["total"] * 100)
+            if model_data["total"] > 0
+            else 0
+        )
 
-        results.append({
-            'model_id': model_data['model_id'],
-            'model_name': model_data['model_name'],
-            'accuracy': round(accuracy, 2),
-            'total_evaluations': model_data['total'],
-            'invalid_evaluations': model_data['invalid']
-        })
+        results.append(
+            {
+                "model_id": model_data["model_id"],
+                "model_name": model_data["model_name"],
+                "accuracy": round(accuracy, 2),
+                "total_evaluations": model_data["total"],
+                "invalid_evaluations": model_data["invalid"],
+            }
+        )
 
     return results

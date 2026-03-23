@@ -6,13 +6,13 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('genaigrader', '0003_rename_username_course_user'),
+        ("genaigrader", "0003_rename_username_course_user"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='evaluation',
-            name='time',
+            model_name="evaluation",
+            name="time",
             field=models.FloatField(default=1),
             preserve_default=False,
         ),

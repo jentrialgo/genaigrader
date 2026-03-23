@@ -1,14 +1,14 @@
 import json
-
-from django.test import TestCase
-
-from django.core.files.uploadedfile import SimpleUploadedFile
 from unittest.mock import patch
+
+from django.contrib.auth.models import User
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import TestCase
+from django.test.client import RequestFactory
+
 from genaigrader.models import Course, Exam, Question
 from genaigrader.services.exam_service import process_exam_file
 from genaigrader.views.evaluate_views import upload_file
-from django.test.client import RequestFactory
-from django.contrib.auth.models import User
 
 VALID_EXAM_FILE_CONTENT = """
 What's the PATH?
@@ -48,6 +48,7 @@ c) FAT32
 d) None of the above
 d)
 """
+
 
 class UploadFileTestCase(TestCase):
     def setUp(self):
@@ -126,7 +127,7 @@ class UploadFileTestCase(TestCase):
         # Assert that no exam or questions were created
         self.assertEqual(Exam.objects.count(), 0)
         self.assertEqual(Question.objects.count(), 0)
-        
+
     def test_upload_file_invalid_exam_file_no_options(self):
         """This test case checks the behavior when a file with a question without options is uploaded.
         It should return a 400 status code and not create any exam or questions."""
@@ -140,7 +141,9 @@ class UploadFileTestCase(TestCase):
     def test_upload_file_invalid_exam_file_no_correct_answer_two_questions(self):
         """This test case checks the behavior when an exam file with no correct answer for two questions is uploaded.
         It should return a 400 status code and not create any exam or questions."""
-        self.__test_updload_file_invalid_exam_file(INVALID_EXAM_FILE_NO_CORRECT_ANSWER_TWO_QUESTIONS)
+        self.__test_updload_file_invalid_exam_file(
+            INVALID_EXAM_FILE_NO_CORRECT_ANSWER_TWO_QUESTIONS
+        )
 
     def test_empty_exam_file(self):
         """This test case checks the behavior when an empty exam file is uploaded.
@@ -149,9 +152,13 @@ class UploadFileTestCase(TestCase):
 
     def test_upload_blocks_duplicate_exam_name_from_file_name(self):
         """Uploading with an existing exam name in the same course returns 409 and avoids duplicates."""
-        existing_exam = Exam.objects.create(description="test.txt", course=self.course, user=self.user)
+        existing_exam = Exam.objects.create(
+            description="test.txt", course=self.course, user=self.user
+        )
 
-        request = self._mock_request(file_content=VALID_EXAM_FILE_CONTENT.encode(), file_name="test.txt")
+        request = self._mock_request(
+            file_content=VALID_EXAM_FILE_CONTENT.encode(), file_name="test.txt"
+        )
         response = upload_file(request)
 
         self.assertEqual(response.status_code, 409)
@@ -160,13 +167,17 @@ class UploadFileTestCase(TestCase):
         self.assertEqual(payload["existing_exam_id"], existing_exam.id)
         self.assertEqual(payload["exam_name"], "test.txt")
         self.assertEqual(payload["course_name"], self.course.name)
-        self.assertEqual(payload["message"], "An exam with this name already exists in this course.")
+        self.assertEqual(
+            payload["message"], "An exam with this name already exists in this course."
+        )
         self.assertEqual(Exam.objects.count(), 1)
         self.assertEqual(Question.objects.count(), 0)
 
     def test_upload_blocks_duplicate_exam_name_from_user_exam(self):
         """The user_exam field has priority over file name when checking for conflicts."""
-        existing_exam = Exam.objects.create(description="Midterm 1", course=self.course, user=self.user)
+        existing_exam = Exam.objects.create(
+            description="Midterm 1", course=self.course, user=self.user
+        )
 
         request = self._mock_request(
             file_content=VALID_EXAM_FILE_CONTENT.encode(),
@@ -181,7 +192,9 @@ class UploadFileTestCase(TestCase):
         self.assertEqual(payload["existing_exam_id"], existing_exam.id)
         self.assertEqual(payload["exam_name"], "Midterm 1")
         self.assertEqual(payload["course_name"], self.course.name)
-        self.assertEqual(payload["message"], "An exam with this name already exists in this course.")
+        self.assertEqual(
+            payload["message"], "An exam with this name already exists in this course."
+        )
         self.assertEqual(Exam.objects.count(), 1)
         self.assertEqual(Question.objects.count(), 0)
 
@@ -198,13 +211,16 @@ class UploadFileTestCase(TestCase):
                 "model": "Test Model",
             },
         )
-        request.FILES["file"] = SimpleUploadedFile("test.txt", VALID_EXAM_FILE_CONTENT.encode())
+        request.FILES["file"] = SimpleUploadedFile(
+            "test.txt", VALID_EXAM_FILE_CONTENT.encode()
+        )
         request.user = self.user
 
         response = upload_file(request)
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(Exam.objects.filter(description="test.txt").count(), 2)
+
 
 class TestExamService(TestCase):
     def test_invalid_exam_file_no_options(self):
@@ -215,5 +231,3 @@ class TestExamService(TestCase):
         # Assert that an exception is raised when calling process_exam_file
         with self.assertRaises(ValueError):
             process_exam_file(file_path)
-
-

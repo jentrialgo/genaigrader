@@ -6,18 +6,18 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('genaigrader', '0004_evaluation_time'),
+        ("genaigrader", "0004_evaluation_time"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='model',
-            name='api_key',
+            model_name="model",
+            name="api_key",
             field=models.CharField(blank=True, max_length=255, null=True),
         ),
         migrations.AddField(
-            model_name='model',
-            name='api_url',
+            model_name="model",
+            name="api_url",
             field=models.URLField(blank=True, max_length=500, null=True),
         ),
     ]

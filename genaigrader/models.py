@@ -1,7 +1,9 @@
-from django.db import models
+import re
+
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
-import re
+from django.db import models
+
 
 class Course(models.Model):
     id = models.AutoField(primary_key=True)
@@ -11,31 +13,40 @@ class Course(models.Model):
     def __str__(self):
         return self.name
 
+
 class Exam(models.Model):
     id = models.AutoField(primary_key=True)
     description = models.CharField(max_length=255)
-    course = models.ForeignKey(Course, on_delete=models.CASCADE) 
-    user = models.ForeignKey(User, on_delete=models.CASCADE)  
+    course = models.ForeignKey(Course, on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
 
     def __str__(self):
         return self.description
 
+
 class QuestionOption(models.Model):
     id = models.AutoField(primary_key=True)
     content = models.CharField(max_length=255)
-    question = models.ForeignKey('Question', on_delete=models.CASCADE)
+    question = models.ForeignKey("Question", on_delete=models.CASCADE)
 
     def __str__(self):
         return self.content
 
+
 class Question(models.Model):
     id = models.AutoField(primary_key=True)
     statement = models.TextField()
-    correct_option = models.ForeignKey(QuestionOption, on_delete=models.CASCADE, null=True, related_name='correct_option_for')
+    correct_option = models.ForeignKey(
+        QuestionOption,
+        on_delete=models.CASCADE,
+        null=True,
+        related_name="correct_option_for",
+    )
     exam = models.ForeignKey(Exam, on_delete=models.CASCADE)
-    
+
     def __str__(self):
-        return self.statement[:50]  
+        return self.statement[:50]
+
 
 class Model(models.Model):
     id = models.AutoField(primary_key=True)
@@ -51,8 +62,10 @@ class Model(models.Model):
         if self.is_external and not self.user:
             raise ValidationError("The 'user' field is required for external models")
         if not self.is_external and self.user:
-            raise ValidationError("The 'user' field should only be used for external models")
-        
+            raise ValidationError(
+                "The 'user' field should only be used for external models"
+            )
+
     def __str__(self):
         return self.description
 
@@ -68,20 +81,20 @@ class Model(models.Model):
         model_name = self.description
 
         if self.is_external:
-            return (model_name, 0, '', '', True)
+            return (model_name, 0, "", "", True)
 
         # Local models pattern: family:size or family:size-variant
         # Examples: gemma3:1b, deepseek-r1:7b, phi4-mini-reasoning, llama3.2:3b
 
         # Handle models without size (like phi4-mini-reasoning)
-        if ':' not in model_name:
-            return (model_name, 0, '', '', False)
+        if ":" not in model_name:
+            return (model_name, 0, "", "", False)
 
-        family, size_part = model_name.split(':', 1)
+        family, size_part = model_name.split(":", 1)
 
         # Extract size and variant from size_part
         # Examples: "1b", "7b", "1b-it-qat", "27b-it-qat"
-        size_match = re.match(r'^(\d+(?:\.\d+)?)([a-zA-Z]*)(.*)', size_part)
+        size_match = re.match(r"^(\d+(?:\.\d+)?)([a-zA-Z]*)(.*)", size_part)
 
         if size_match:
             size_value = float(size_match.group(1))
@@ -90,7 +103,7 @@ class Model(models.Model):
             return (family, size_value, size_unit, variant, False)
         else:
             # If no size match, treat entire size_part as variant
-            return (family, 0, '', size_part, False)
+            return (family, 0, "", size_part, False)
 
     def get_sort_key(self):
         """
@@ -106,8 +119,16 @@ class Model(models.Model):
             # Extract model information from name for local models
             family, size_value, size_unit, variant, _ = self._extract_model_info()
             # Sort by: family, size_value, size_unit (b < others), variant
-            size_unit_priority = 0 if size_unit.lower() == 'b' else 1
-            return (0, family.lower(), size_value, size_unit_priority, size_unit.lower(), variant.lower())
+            size_unit_priority = 0 if size_unit.lower() == "b" else 1
+            return (
+                0,
+                family.lower(),
+                size_value,
+                size_unit_priority,
+                size_unit.lower(),
+                variant.lower(),
+            )
+
 
 class Evaluation(models.Model):
     id = models.AutoField(primary_key=True)
@@ -115,20 +136,32 @@ class Evaluation(models.Model):
     ev_date = models.DateTimeField()
     grade = models.FloatField()
     time = models.FloatField()
-    model = models.ForeignKey(Model, on_delete= models.CASCADE)
+    model = models.ForeignKey(Model, on_delete=models.CASCADE)
     exam = models.ForeignKey(Exam, on_delete=models.CASCADE)
-    ollama_version = models.CharField(max_length=50, null=True, blank=True, help_text="Version of Ollama used (null for external models)")
-    notes = models.TextField(blank=True, null=True, help_text="Optional notes for the evaluation")
+    ollama_version = models.CharField(
+        max_length=50,
+        null=True,
+        blank=True,
+        help_text="Version of Ollama used (null for external models)",
+    )
+    notes = models.TextField(
+        blank=True, null=True, help_text="Optional notes for the evaluation"
+    )
 
     def __str__(self):
-        return f'{self.prompt} {self.grade}'
+        return f"{self.prompt} {self.grade}"
+
 
 class QuestionEvaluation(models.Model):
     id = models.AutoField(primary_key=True)
     evaluation = models.ForeignKey(Evaluation, on_delete=models.CASCADE)
     question = models.ForeignKey(Question, on_delete=models.CASCADE)
-    question_option = models.ForeignKey(QuestionOption, on_delete=models.CASCADE, null=True, blank=True)
+    question_option = models.ForeignKey(
+        QuestionOption, on_delete=models.CASCADE, null=True, blank=True
+    )
 
     def __str__(self):
-        option_id = self.question_option_id if self.question_option_id is not None else "None"
+        option_id = (
+            self.question_option_id if self.question_option_id is not None else "None"
+        )
         return f"Evaluation {self.evaluation.id}, Question {self.question.id}, Option {option_id}"

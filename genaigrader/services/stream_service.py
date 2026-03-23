@@ -1,14 +1,17 @@
 import json
 import logging
 import time
+
 from django.db import transaction
 from django.utils import timezone
+
 from genaigrader.models import Evaluation, QuestionEvaluation, QuestionOption
 from genaigrader.services.llm_service import generate_prompt
 from genaigrader.services.ollama_version_service import get_evaluation_ollama_version
 
 # Set logging level to INFO
 logging.basicConfig(level=logging.INFO)
+
 
 def stream_responses(questions, user_prompt, llm, total_questions, exam, notes=None):
     """
@@ -31,17 +34,17 @@ def stream_responses(questions, user_prompt, llm, total_questions, exam, notes=N
 
     evaluation = Evaluation(
         prompt=(
-            (f"{user_prompt}\n\n" if user_prompt else "") +
-            "Te voy a pasar una pregunta de test y tienes que responderme con qué opción es la correcta. "
+            (f"{user_prompt}\n\n" if user_prompt else "")
+            + "Te voy a pasar una pregunta de test y tienes que responderme con qué opción es la correcta. "
             "Sólo debes decirme la opción, por ejemplo 'a', absolutamente nada más.\n"
         ),
         ev_date=timezone.now(),
         grade=0,
-        model=llm.model_obj, 
+        model=llm.model_obj,
         exam=exam,
         time=0.0,
         ollama_version=get_evaluation_ollama_version(llm.model_obj),
-        notes=notes
+        notes=notes,
     )
     for index, question in enumerate(questions):
         start_time = time.monotonic()
@@ -55,7 +58,7 @@ def stream_responses(questions, user_prompt, llm, total_questions, exam, notes=N
                 llm,
                 total_questions,
                 evaluation,
-                question_evaluations
+                question_evaluations,
             )
         except Exception as e:
             logging.error(f"Error processing question {index + 1}: {e}")
@@ -63,26 +66,30 @@ def stream_responses(questions, user_prompt, llm, total_questions, exam, notes=N
                 "error": str(e),
                 "processed_questions": index + 1,
                 "total_questions": total_questions,
-                "correct_count": correct_count
+                "correct_count": correct_count,
             }
             yield f"data: {json.dumps(error_json)}\n\n"
-            return # Terminate the evaluation if an error occurs
+            return  # Terminate the evaluation if an error occurs
 
         end_time = time.monotonic()
         question_time = end_time - start_time
         total_evaluation_time += question_time
 
-        correct_count = progress['correct_count']
-        progress['time'] = round(question_time, 2)
+        correct_count = progress["correct_count"]
+        progress["time"] = round(question_time, 2)
 
         if index == len(questions) - 1:
-            progress['total_time'] = round(total_evaluation_time, 2)
+            progress["total_time"] = round(total_evaluation_time, 2)
 
         yield f"data: {json.dumps(progress)}\n\n"
 
     # All questions processed successfully, now save everything in a transaction
     with transaction.atomic():
-        evaluation.grade = round((correct_count / total_questions * 10), 2) if total_questions > 0 else 0.0
+        evaluation.grade = (
+            round((correct_count / total_questions * 10), 2)
+            if total_questions > 0
+            else 0.0
+        )
         evaluation.time = round(total_evaluation_time, 2)
         evaluation.save()
 
@@ -90,7 +97,17 @@ def stream_responses(questions, user_prompt, llm, total_questions, exam, notes=N
             q_eval.evaluation = evaluation
             q_eval.save()
 
-def process_question(correct_count, index, question, user_prompt, llm, total_questions, evaluation, question_evaluations):
+
+def process_question(
+    correct_count,
+    index,
+    question,
+    user_prompt,
+    llm,
+    total_questions,
+    evaluation,
+    question_evaluations,
+):
     """
     Processes a single question using the provided LlmApi instance and updates evaluation state.
 
@@ -109,7 +126,7 @@ def process_question(correct_count, index, question, user_prompt, llm, total_que
     """
     prompt_data = generate_prompt(question, user_prompt)
     logging.info(f"Question prompt: {prompt_data['prompt']}")
-    llm_response_list = list(llm.generate_response(prompt_data['prompt']))
+    llm_response_list = list(llm.generate_response(prompt_data["prompt"]))
     logging.info(f"LLM response: {''.join(llm_response_list)}\n")
 
     if not llm_response_list:
@@ -122,18 +139,16 @@ def process_question(correct_count, index, question, user_prompt, llm, total_que
         first_token = llm_response_list[0].strip().lower()
         response = first_token[0] if first_token else ""
 
-    is_correct = (response == question.correct_option.content.strip().lower()[0])
+    is_correct = response == question.correct_option.content.strip().lower()[0]
 
     selected_option = None
     if response:
         selected_option = QuestionOption.objects.filter(
-            question=question,
-            content__istartswith=response
+            question=question, content__istartswith=response
         ).first()
 
     question_eval = QuestionEvaluation(
-        question=question,
-        question_option=selected_option
+        question=question, question_option=selected_option
     )
     question_evaluations.append(question_eval)
 
@@ -145,11 +160,11 @@ def process_question(correct_count, index, question, user_prompt, llm, total_que
         "total_questions": total_questions,
         "correct_count": correct_count,
         "response": {
-            "question_prompt": prompt_data['question_prompt'],
-            "user_prompt": prompt_data['user_prompt'],
-            "prompt": prompt_data['prompt'],
+            "question_prompt": prompt_data["question_prompt"],
+            "user_prompt": prompt_data["user_prompt"],
+            "prompt": prompt_data["prompt"],
             "response": response,
             "correct_option": question.correct_option.content,
             "is_correct": is_correct,
-        }
+        },
     }

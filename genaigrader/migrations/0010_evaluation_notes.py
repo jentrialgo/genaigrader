@@ -6,13 +6,15 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('genaigrader', '0009_evaluation_ollama_version'),
+        ("genaigrader", "0009_evaluation_ollama_version"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='evaluation',
-            name='notes',
-            field=models.TextField(blank=True, help_text='Optional notes for the evaluation', null=True),
+            model_name="evaluation",
+            name="notes",
+            field=models.TextField(
+                blank=True, help_text="Optional notes for the evaluation", null=True
+            ),
         ),
     ]
