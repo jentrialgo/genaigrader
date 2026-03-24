@@ -5,11 +5,13 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+    "dj-database-url>=2.2.0",
     "django>=5.2.1",
     "gunicorn>=23.0.0",
     "ollama>=0.4.8",
     "openai>=1.78.1",
     "packaging>=25.0",
+    "psycopg2-binary",
     "requests>=2.32.3",
     "whitenoise>=6.9.0",
 ]
