@@ -1,6 +1,7 @@
 import json
 
 import requests
+from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse, QueryDict, StreamingHttpResponse
 from django.shortcuts import get_object_or_404, render
@@ -10,7 +11,7 @@ from django.views.decorators.http import require_http_methods
 from genaigrader.models import Model
 from genaigrader.services.get_models_service import get_models_for_user
 
-OLLAMA_BASE_URL = "http://localhost:11434"
+OLLAMA_BASE_URL = settings.OLLAMA_API_URL
 
 
 @login_required
