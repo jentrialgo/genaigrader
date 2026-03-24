@@ -1,36 +1,75 @@
-name: Django Tests
+name: CI
 
-on: [push, pull_request]
+on:
+  pull_request:
+  push:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+
+      - name: Install dev dependencies
+        run: ~/.local/bin/uv sync --group dev
+
+      - name: Run pre-commit hooks
+        run: ~/.local/bin/uv run pre-commit run --all-files
+
   test:
     runs-on: ubuntu-latest
-
+    needs: quality
     env:
       DJANGO_SETTINGS_MODULE: mi_web.settings
-      MANAGE_PY_PATH: manage.py
-
     steps:
-      # Step 1: Checkout repository
-      - uses: actions/checkout@v3
+      - name: Checkout
+        uses: actions/checkout@v5
 
-      # Step 2: Configure Python
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v6
         with:
-          python-version: '3.11'
+          python-version: "3.11"
 
-      # Step 3: Install uv
       - name: Install uv
-        run: |
-          curl -LsSf https://astral.sh/uv/install.sh | sh
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
 
-      # Step 4: Run migrations
-      - name: Run Django migrations
-        run: |
-          ~/.local/bin/uv run python manage.py migrate
+      - name: Install dependencies
+        run: ~/.local/bin/uv sync
 
-      # Step 5: Run tests
-      - name: Run Django tests
-        run: |
-          ~/.local/bin/uv run python manage.py test
+      - name: Run Django check
+        run: ~/.local/bin/uv run python manage.py check
+
+      - name: Run migrations
+        run: ~/.local/bin/uv run python manage.py migrate
+
+      - name: Run tests
+        run: ~/.local/bin/uv run python manage.py test
+
+  docker-build:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: genaigrader:${{ github.sha }}

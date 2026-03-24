@@ -1,172 +1,195 @@
 # GenAI Grader
 
-GenAI Grader is a web platform for automated exam grading using both local (Ollama) and remote (external API) language models. It allows you to manage courses, exams, and perform batch evaluations, providing analytics and downloadable reports.
+GenAI Grader is a specialized web platform designed for the automated evaluation of academic examinations. The system leverages both local large language models (via Ollama) and remote providers through external APIs to facilitate batch grading, analytics, and comprehensive reporting.
 
-## Features
+## Core Features
 
-- **Course and Exam Management:** Create, edit, and delete courses. Assign exams to courses.
-- **Automated Grading:** Select language models (local or external) to automatically grade exams.
-- **Batch Evaluations:** Run batch evaluations on multiple exams and models.
-- **Analytics and Reports:** View results, download reports, and access detailed analytics.
-- **Model Management:** Add external models via API or download local models from Ollama.
-- **Modern Interface:** Responsive dark UI with custom styles in `/static/css/`.
-
-## Installation - Linux
-
-1. **Clone the repository**
-   ```sh
-   git clone <your-repo-url>
-   cd genaigrader
-   ```
-
-2. **Install dependencies and Ollama**
-   To install `uv`, run:
-   ```bash
-   curl -LsSf https://astral.sh/uv/install.sh | sh
-   ```
-   Then, install dependencies:
-   ```sh
-   uv pip install -r requirements.txt
-   ```
-
-   To use local models, install [Ollama](https://ollama.com/) and start the service:
-   ```sh
-   # On Linux:
-   curl -fsSL https://ollama.com/install.sh | sh
-   ollama serve
-   ```
-   *Note: Remember to pull the models you want to use (e.g., `ollama pull llama3`).*
-
-3. **Configure environment variables**
-   Copy `.env.example` to `.env`. (Note: The `start_genaigrader.sh` script specifically looks for `.env.django`).
-   ```sh
-   cp .env.example .env
-   ```
-
-4. **Run migrations and collect static files**
-   ```sh
-   uv run manage.py migrate
-   uv run manage.py collectstatic
-   ```
-
-5. **Start the server** (locally on port 8000)
-   ```sh
-   uv run manage.py runserver
-   ```
-   Or use the automated scripts in `scripts/`:
-   ```sh
-   bash scripts/start_genaigrader.sh
-   ```
-   *Note: The script uses port 9898 and expects several configurations. Check `scripts/README.md` for more details.*
-## Installation - Windows
-
-**1. Clone the repository**
-```powershell
-git clone <your-repo-url>
-cd genaigrader
-```
-
-**2. Install dependencies and Ollama**
-To install `uv` (our Python package manager) on Windows, open your PowerShell and run:
-
-```powershell
-powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
-```
-
-> **Note:** You may need to restart your terminal after this step so it recognizes the `uv` command.
-
-Then, install the project dependencies:
-
-```powershell
-uv pip install -r requirements.txt
-```
-
-To use local models, you need to install Ollama:
-
-1. Download Ollama:
-```powershell
-irm https://ollama.com/install.ps1 | iex
-```
-
-2. Pull the models you want to use (e.g., Qwen 2.5 (0.5B)):
-```powershell
-ollama pull qwen2.5:0.5b
-```
-
-**3. Configure environment variables**
-Copy `.env.example` to `.env`. (Note: The automated `.sh` scripts specifically look for `.env.django`, but for local Windows development, a standard `.env` file is what you need).
-
-```powershell
-cp .env.example .env
-```
-
-**4. Run migrations and collect static files**
-```powershell
-uv run manage.py migrate
-uv run manage.py collectstatic
-```
-
-**5. Start the server (locally on port 8000)**
-```powershell
-uv run manage.py runserver
-```
-
-## Pre-commit Tutorial
-
-1. **Run one-time setup**
-   ```powershell
-   uv sync --group dev
-   uv run pre-commit install
-   ```
-
-2. **Run hooks for all files (first run)**
-   ```powershell
-   uv run pre-commit run --all-files
-   ```
-
-3. **Create a commit**
-   ```powershell
-   git add .
-   git commit -m "your message"
-   ```
-
-4. **If files were changed by hooks**
-   ```powershell
-   git add .
-   git commit -m "your message"
-   ```
-
-5. **Update hooks (optional)**
-   ```powershell
-   uv run pre-commit autoupdate
-   ```
-
-## Usage
-
-1. Access the app at `http://localhost:8000/`.
-2. Register or log in.
-3. Create courses and upload exams.
-4. Manage models in the "Models" section.
-5. Run batch evaluations from "Batch Evaluations".
-6. View results and analytics in "Analysis".
-
-## Project Structure
-
-- `genaigrader/`: Main app logic (models, views, services, templates).
-- `mi_web/`: Django configuration (settings, urls, wsgi/asgi).
-- `static/`: Static files (CSS, JS).
-- `uploaded_files/`: User-uploaded files.
-- `scripts/`: Utility scripts for development/deployment.
-
-## Useful Scripts
-
-- `scripts/start_genaigrader.sh`: Start the app with Gunicorn and Ollama in tmux.
-- `scripts/stop_genaigrader.sh`: Stop the app and related processes.
-
-## License
-
-MIT License. See [LICENSE](LICENSE) for details.
+* **Course and Examination Management**: Centralized tools to create and edit academic courses and associate specific exams with them.
+* **Automated Grading Workflows**: Intelligent grading utilizing various language models to provide immediate feedback.
+* **Batch Evaluation Engine**: Capabilities to run large-scale evaluations across multiple exams and models simultaneously.
+* **Analytics and Reporting**: Detailed results visualization and the ability to download generated reports.
+* **Model Integration**: Support for downloading local models through Ollama or integrating proprietary models via API keys.
 
 ---
 
+## Deployment with Docker (Recommended)
+
+The preferred method for running this application is through Docker, which ensures a consistent environment across different operating systems.
+
+### Prerequisites
+
+* Docker Desktop installed on the host machine.
+* Ollama installed on the host machine (only if you plan to run Ollama outside Docker).
+
+### Development Environment
+
+The development configuration is optimized for local iteration, featuring live code reloading and a lightweight SQLite database.
+
+1.  **Clone the Repository**:
+    ```bash
+    git clone <repository-url>
+    cd genaigrader
+    ```
+2.  **Start the Development Containers**:
+    ```bash
+    docker compose -f Docker/docker-compose.dev.yml up --build
+    ```
+    * This service maps port 8000 on the host to port 8000 in the container.
+    * Source code is mounted as a volume to allow real-time updates.
+3.  **Create an Administrative Account**:
+    ```bash
+    docker compose -f Docker/docker-compose.dev.yml exec web uv run manage.py createsuperuser
+    ```
+
+### Production Environment
+
+The production setup utilizes a multi-container architecture for increased stability and performance.
+
+#### Environment Configuration
+
+Before deploying to production, you **must** configure environment variables securely:
+
+1.  **Create a Local `.env` File**:
+    ```bash
+    copy .env.example .env
+    ```
+    * Do **NOT** commit `.env` to version control (it is already in `.gitignore`).
+    * The `.env` file contains sensitive credentials and should only exist on your deployment machine.
+
+2.  **Update Sensitive Values**:
+    Open `.env` and replace the placeholder values:
+    ```dotenv
+    POSTGRES_DB=genaigrader
+    POSTGRES_USER=genai_user
+    POSTGRES_PASSWORD=<strong-random-password>
+    DATABASE_URL=postgres://genai_user:<strong-random-password>@db:5432/genaigrader
+    OLLAMA_HOST=http://host.docker.internal:11434
+    ```
+    * Generate a strong, random password for `POSTGRES_PASSWORD` and update `DATABASE_URL` accordingly.
+    * Never use the same password across environments.
+
+#### Deploy Production Stack
+
+1.  **Initialize Production Stack with Environment Variables**:
+    ```bash
+    docker compose --env-file .env -f Docker/docker-compose.prod.yml up -d --build
+    ```
+    * This environment deploys a PostgreSQL 15-alpine database container.
+    * The database utilizes a persistent volume for data integrity.
+    * Startup is managed by an entrypoint script that automatically applies migrations and collects static files.
+
+2.  **Create an Administrative Account**:
+    ```bash
+    docker compose --env-file .env -f Docker/docker-compose.prod.yml exec web uv run manage.py createsuperuser
+    ```
+
+---
+
+## 🤖 Ollama & Hardware Acceleration
+
+* **CPU-Only by Default**: The containerized development Ollama runs on CPU, meaning lower performance.
+* **Enabling GPU (NVIDIA)**: If the host has an NVIDIA GPU, they must install the NVIDIA Container Toolkit and uncomment the deploy block in `Docker/docker-compose.dev.yml`.
+* **Running Ollama Outside Docker**: For maximum performance without Docker limits (like macOS Metal), they can run Ollama natively on the host and change `OLLAMA_HOST` in their `.env` file.
+
+---
+
+## Manual Installation (Host Machine)
+
+For developers preferring a native installation, the project uses `uv` for dependency management via `pyproject.toml`.
+
+1.  **Dependency Synchronization**:
+    ```bash
+    uv sync
+    ```
+2.  **Database and Static Asset Preparation**:
+    ```bash
+    uv run manage.py migrate
+    uv run manage.py collectstatic
+    ```
+3.  **Start Development Server**:
+    ```bash
+    uv run manage.py runserver
+    ```
+
+---
+
+## Pre-commit Workflow
+
+To maintain code quality (linting and formatting), this project uses pre-commit hooks.
+
+1.  **Initial Setup**:
+    Run the following command to install the hooks. This configuration ensures hooks run correctly even if the virtual environment is not explicitly activated:
+    ```bash
+    uv run pre-commit install --install-hooks
+    ```
+2.  **Manual Execution**:
+    To run all checks against the entire codebase manually:
+    ```bash
+    uv run pre-commit run --all-files
+    ```
+3.  **Automatic Checks**:
+    Hooks will run automatically on every `git commit`. If a hook fails, correct the issues, restage the files, and commit again.
+
+## Testing
+
+Run the automated test suite to validate code functionality and ensure no regressions.
+
+### Run Tests in Development Container
+
+Execute tests inside the development container:
+
+```bash
+docker compose -f Docker/docker-compose.dev.yml exec web uv run python manage.py test
+```
+
+This command:
+* Creates an isolated test database
+* Executes all test files in the `genaigrader/tests/` directory
+* Reports pass/fail status and coverage information
+
+### Run Tests Manually (Host Machine)
+
+If running natively on the host machine:
+
+```bash
+uv run python manage.py test
+```
+
+---
+
+## Operational Commands
+
+* **View Service Logs** (Development):
+    ```bash
+    docker compose -f Docker/docker-compose.dev.yml logs -f
+    ```
+* **View Service Logs** (Production):
+    ```bash
+    docker compose --env-file .env -f Docker/docker-compose.prod.yml logs -f
+    ```
+* **Stop and Remove Containers** (Development):
+    ```bash
+    docker compose -f Docker/docker-compose.dev.yml down
+    ```
+* **Stop and Remove Containers** (Production):
+    ```bash
+    docker compose --env-file .env -f Docker/docker-compose.prod.yml down
+    ```
+* **Dependency Updates**:
+    If `pyproject.toml` is modified, regenerate the lockfile before rebuilding images:
+    ```bash
+    uv lock
+    ```
+
+## Project Structure
+
+* `genaigrader/`: Core application logic, including models, views, and templates.
+* `mi_web/`: Global Django project configurations and settings.
+* `Docker/`: Containerization configurations, including Dockerfiles and Compose files.
+* `static/`: Source directory for CSS and JavaScript assets.
+* `scripts/`: Utility scripts for automated deployment and process management.
+
+## license
+
+MIT License. See [LICENSE](LICENSE) for details.
 For questions or suggestions, open an issue or contact the author.
