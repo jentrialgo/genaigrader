@@ -8,6 +8,29 @@ document.addEventListener("DOMContentLoaded", () => {
         return null;
     };
 
+    const getContrastColor = (hex) => {
+        if (!hex || !hex.startsWith('#') || (hex.length !== 7 && hex.length !== 4)) {
+            return '#ffffff';
+        }
+        const normalized = hex.length === 4
+            ? `#${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}`
+            : hex;
+        const r = parseInt(normalized.slice(1, 3), 16);
+        const g = parseInt(normalized.slice(3, 5), 16);
+        const b = parseInt(normalized.slice(5, 7), 16);
+        const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+        return luminance > 0.5 ? '#0f172a' : '#ffffff';
+    };
+
+    const applyBadgeColors = () => {
+        document.querySelectorAll('.family-badge').forEach(badge => {
+            const color = badge.dataset.color;
+            if (!color) return;
+            badge.style.backgroundColor = color;
+            badge.style.color = getContrastColor(color);
+        });
+    };
+
     // Show form
     document.getElementById('show-form').addEventListener('click', () => {
         document.getElementById('creation-form').style.display = 'block';
@@ -39,7 +62,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         row.remove();
                     } else {
                         const data = await response.json();
-                        throw new Error(data.message || 'Delete error');
+                        alert(data.message || 'Delete error');
                     }
                 } catch(error) {
                     alert(error.message);
@@ -87,25 +110,9 @@ document.addEventListener("DOMContentLoaded", () => {
             const data = await response.json();
             
             if (response.ok) {
-                        const newRow = `
-                        <tr data-id="${data.model.id}">
-                            <td data-full-value="${data.model.description}">${data.model.description}</td>
-                            <td data-full-value="${data.model.api_url}">${data.model.api_url}</td>
-                            <td data-full-value="${data.model.api_key}">${data.model.api_key.length > 10 ? data.model.api_key.substring(0,7) + '...' : data.model.api_key}</td>
-                            <td>
-                                <button class="edit-btn">Edit</button>
-                                <button class="delete-btn">Delete</button>
-                            </td>
-                        </tr>
-                    `;
-                document.querySelector('#model-table tbody').insertAdjacentHTML('beforeend', newRow);
-               
-                document.getElementById('creation-form').style.display = 'none';
-                document.getElementById('desc').value = '';
-                document.getElementById('url').value = '';
-                document.getElementById('key').value = '';
+                location.reload();
             } else {
-                throw new Error(data.message || 'Server error');
+                alert(data.message || 'Server error');
             }
         } catch(error) {
             console.error('Error:', error);
@@ -116,8 +123,11 @@ document.addEventListener("DOMContentLoaded", () => {
     // Edit mode
     function enterEditMode(row) {
         const cells = row.querySelectorAll('td');
-        const [descCell, urlCell, keyCell, actionsCell] = cells;
-        
+        const descCell = cells[0];
+        const urlCell = cells[2];
+        const keyCell = cells[3];
+        const actionsCell = cells[4];
+
         row.originalContent = {
             description: descCell.dataset.fullValue,
             url: urlCell.dataset.fullValue,
@@ -157,19 +167,19 @@ document.addEventListener("DOMContentLoaded", () => {
             if (response.ok) {
                 const cells = row.querySelectorAll('td');
                 cells[0].dataset.fullValue = newData.description;
-                cells[1].dataset.fullValue = newData.api_url;
-                cells[2].dataset.fullValue = newData.api_key;
+                cells[2].dataset.fullValue = newData.api_url;
+                cells[3].dataset.fullValue = newData.api_key;
                 
                 cells[0].textContent = newData.description;
-                cells[1].textContent = newData.api_url;
-                cells[2].textContent = newData.api_key.length > 10 
+                cells[2].textContent = newData.api_url;
+                cells[3].textContent = newData.api_key.length > 10 
                     ? newData.api_key.substring(0, 7) + '...' 
                     : newData.api_key;
                 
-                cells[3].innerHTML = row.originalContent.html;
+                cells[4].innerHTML = row.originalContent.html;
             } else {
                 const data = await response.json();
-                throw new Error(data.message || 'Save error');
+                alert(data.message || 'Save error');
             }
         } catch(error) {
             alert(error.message);
@@ -181,11 +191,11 @@ document.addEventListener("DOMContentLoaded", () => {
     function cancelEdit(row) {
         const cells = row.querySelectorAll('td');
         cells[0].textContent = row.originalContent.description;
-        cells[1].textContent = row.originalContent.url;
-        cells[2].textContent = row.originalContent.key.length > 10 
+        cells[2].textContent = row.originalContent.url;
+        cells[3].textContent = row.originalContent.key.length > 10 
             ? row.originalContent.key.substring(0, 7) + '...' 
             : row.originalContent.key;
-        cells[3].innerHTML = row.originalContent.html;
+        cells[4].innerHTML = row.originalContent.html;
     }
 document.getElementById('download-form').addEventListener('submit', function(e) {
     e.preventDefault();
@@ -256,4 +266,6 @@ document.getElementById('download-form').addEventListener('submit', function(e) 
         messageBox.className = 'message error';
     });
 });
+
+    applyBadgeColors();
 });

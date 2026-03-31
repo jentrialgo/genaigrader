@@ -6,6 +6,7 @@ from genaigrader.services.graphics_service import (
     compute_model_statistics,
     process_evaluations_for_graphics,
 )
+from genaigrader.services.model_service import DEFAULT_MODEL_COLOR
 
 
 @login_required
@@ -51,5 +52,6 @@ def analysis_view(request):
             "course_data": course_data,
             "overall_model_averages": overall_model_averages,
             "overall_time_averages": overall_time_averages,
+            "default_model_color": DEFAULT_MODEL_COLOR,
         },
     )

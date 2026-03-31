@@ -10,6 +10,7 @@ from django.views.decorators.http import require_http_methods
 
 from genaigrader.models import Model
 from genaigrader.services.get_models_service import get_models_for_user
+from genaigrader.services.model_service import DEFAULT_MODEL_COLOR
 
 OLLAMA_BASE_URL = settings.OLLAMA_API_URL
 
@@ -20,7 +21,11 @@ def api_view(request):
     return render(
         request,
         "api.html",
-        {"local_models": local_models, "external_models": external_models},
+        {
+            "local_models": local_models,
+            "external_models": external_models,
+            "default_model_color": DEFAULT_MODEL_COLOR,
+        },
     )
 
 

@@ -127,6 +127,7 @@
     <!-- Pass chart data to JavaScript -->
     {{ model_averages|json_script:"model-averages-data" }}
     {{ time_averages|json_script:"time-averages-data" }}
+    {{ default_model_color|json_script:"default-model-color" }}
 </div>
 {% endblock %}
 

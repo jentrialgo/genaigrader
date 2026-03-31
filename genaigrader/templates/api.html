@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% load static %}
+{% load color_filters %}
 
 {% block title %}GenAI Grader - Models{% endblock %}
 {% block header %}GenAI Grader - Models{% endblock %}
@@ -14,9 +15,12 @@
   
   <button id="show-form">New External Model</button>
   
-  <div id="creation-form" style="display:none; margin:20px 0;">
+    <div id="creation-form" class="api-creation-form-spacing">
+    <label for="desc">Description</label>
     <input type="text" id="desc" placeholder="Description">
+    <label for="url">URL</label>
     <input type="url" id="url" placeholder="URL">
+    <label for="key">API Key</label>
     <input type="text" id="key" placeholder="API Key">
     <button id="create-btn">Create</button>
   </div>
@@ -28,13 +32,14 @@
       <input type="text" id="model-name" name="model" required placeholder="e.g. llama3:8b">
       <button type="submit">Download</button>
     </form>
-    <div id="message" class="message" style="display: none;"></div>
+    <div id="message" class="message is-hidden"></div>
   </div>
 
   <table id="model-table">
       <thead>
           <tr>
               <th>Description</th>
+              <th>Metadata</th>
               <th>URL</th>
               <th>API Key</th>
               <th>Actions</th>
@@ -47,6 +52,14 @@
           {% for model in local_models %}
           <tr data-id="{{ model.id }}">
               <td data-full-value="{{ model.description }}">{{ model.description }}</td>
+              <td>
+                  <div class="model-meta-group">
+                      <span class="family-badge" data-color="{{ model.color|default:default_model_color }}">
+                          {{ model.family_name|default:"Unknown family" }}
+                      </span>
+                      <span class="meta-pill">{{ model.parameter_count|default:"?" }}B</span>
+                  </div>
+              </td>
               <td>N/A</td>
               <td>N/A</td>
               <td>
@@ -67,6 +80,14 @@
           {% for model in external_models %}
           <tr data-id="{{ model.id }}">
               <td data-full-value="{{ model.description }}">{{ model.description }}</td>
+              <td>
+                  <div class="model-meta-group">
+                      <span class="family-badge" data-color="{{ model.color|default:default_model_color }}">
+                          {{ model.family_name|default:"External" }}
+                      </span>
+                      <span class="meta-pill">Version: {{ model.version|default:"default" }}</span>
+                  </div>
+              </td>
               <td data-full-value="{{ model.api_url }}">{{ model.api_url }}</td>
               <td data-full-value="{{ model.api_key }}">{{ model.api_key|truncatechars:10 }}</td>
               <td>
