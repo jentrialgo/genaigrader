@@ -1,4 +1,5 @@
 from genaigrader.models import QuestionEvaluation
+from genaigrader.services import model_service
 
 
 def calculate_question_analytics(question):
@@ -27,6 +28,7 @@ def calculate_question_analytics(question):
             models_data[model_key] = {
                 "model_id": model.id,
                 "model_name": model.description,
+                "model_color": model_service.resolve_model_color(model),
                 "correct": 0,
                 "invalid": 0,
                 "total": 0,
@@ -60,6 +62,7 @@ def calculate_question_analytics(question):
             {
                 "model_id": model_data["model_id"],
                 "model_name": model_data["model_name"],
+                "model_color": model_data["model_color"],
                 "accuracy": round(accuracy, 2),
                 "total_evaluations": model_data["total"],
                 "invalid_evaluations": model_data["invalid"],

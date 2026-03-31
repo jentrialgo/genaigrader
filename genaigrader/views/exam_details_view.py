@@ -8,6 +8,7 @@ from genaigrader.services.graphics_service import (
     compute_model_statistics,
     process_evaluations_for_graphics,
 )
+from genaigrader.services.model_service import DEFAULT_MODEL_COLOR
 from genaigrader.services.question_analytics_service import calculate_question_analytics
 
 
@@ -37,6 +38,7 @@ def exam_detail(request, exam_id):
             "evaluations": evaluations,
             "model_averages": model_averages,
             "time_averages": time_averages,
+            "default_model_color": DEFAULT_MODEL_COLOR,
         },
     )
 

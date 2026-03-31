@@ -2,39 +2,71 @@ document.addEventListener('DOMContentLoaded', function () {
     const courseData = JSON.parse(document.getElementById('course-data').textContent);
     const overallGrades = JSON.parse(document.getElementById('overall-grades').textContent);
     const overallTimes = JSON.parse(document.getElementById('overall-times').textContent);
+    const defaultModelColor = JSON.parse(document.getElementById('default-model-color').textContent);
 
-    /**
-     * Creates a bar chart with error bars only for models with data
-     * @param {HTMLCanvasElement} canvas
-     * @param {Array} rawData
-     * @param {string} field
-     * @param {string} title
-     * @param {string} colorRGB
-     * @param {number} decimals
-     * @param {{min: number, max: number}} yRange
-     */
-    const createErrorBarChart = (canvas, rawData, field, title, colorRGB, decimals = 2, yRange) => {
+    const hexToRgba = (hex, alpha = 0.3) => {
+        const r = parseInt(hex.slice(1, 3), 16);
+        const g = parseInt(hex.slice(3, 5), 16);
+        const b = parseInt(hex.slice(5, 7), 16);
+        return `rgba(${r},${g},${b},${alpha})`;
+    };
+
+
+const createErrorBarChart = (canvas, rawData, field, title, decimals = 2, yRange) => {
         const labels = rawData.map(d => d.model__description);
-        const data = rawData.map(item => ({ x: item.model__description, y: item[field], yMin: item.yMin, yMax: item.yMax, count: item.count }));
+
+        const bgColors = rawData.map(item => hexToRgba(item.model_color || defaultModelColor, 0.3));
+        const borderColors = rawData.map(item => item.model_color || defaultModelColor);
+
+
+        const datasets = [{
+            label: title,
+            data: rawData.map(item => ({
+                x: item.model__description,
+                y: item[field],
+                yMin: item.yMin,
+                yMax: item.yMax,
+                count: item.count
+            })),
+            backgroundColor: bgColors,
+            borderColor: borderColors,
+            borderWidth: 2,
+            borderRadius: 4,
+            errorBarWhiskerColor: '#cbd5e1',
+            errorBarColor: '#cbd5e1'
+        }];
 
         if (canvas.chartInstance) canvas.chartInstance.destroy();
+
         canvas.chartInstance = new Chart(canvas.getContext('2d'), {
             type: 'barWithErrorBars',
-            data: { labels, datasets: [{ label: title, data, backgroundColor: `rgba(${colorRGB}, 0.3)`, borderColor: `rgba(${colorRGB}, 1)`, borderWidth: 1, borderRadius: 4, errorBarWhiskerColor: `#FFF`, errorBarColor: `#FFF` }] },
+            data: {
+                labels,
+                datasets
+            },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
                 parsing: false,
+                indexAxis: undefined,
                 plugins: {
                     legend: { display: false },
-                    tooltip: { callbacks: { label: ctx => {
+                    tooltip: {
+                        callbacks: {
+                            label: ctx => {
                                 const r = ctx.raw;
                                 const evaluationText = r.count === 1 ? 'evaluation' : 'evaluations';
                                 return `${title}: ${r.y.toFixed(decimals)} (${r.yMin.toFixed(decimals)} - ${r.yMax.toFixed(decimals)}) | ${r.count} ${evaluationText}`;
-                            } } }
+                            }
+                        }
+                    }
                 },
                 scales: {
-                    x: { type: 'category', ticks: { color: '#94a3b8' }, grid: { display: false } },
+                    x: {
+                        type: 'category',
+                        ticks: { color: '#94a3b8' },
+                        grid: { display: false }
+                    },
                     y: Object.assign({
                         beginAtZero: false,
                         ticks: { color: '#94a3b8', callback: v => v.toFixed(decimals) },
@@ -53,32 +85,27 @@ document.addEventListener('DOMContentLoaded', function () {
             max: Math.max(...yMaxs) + 2
         };
     };
-
-    const gradeBarColour = '59,130,246';
-    const timeBarColour = '255,99,132';
     
-    // Course charts
     courseData.forEach(course => {
         const g = document.getElementById(`grade-chart-${course.course.id}`);
         const t = document.getElementById(`time-chart-${course.course.id}`);
         
         if (course.model_averages.length) {
             const yRange = calculateRange(course.model_averages);
-            createErrorBarChart(g, course.model_averages, 'avg', 'Grades', gradeBarColour, 2, yRange);
+            createErrorBarChart(g, course.model_averages, 'avg', 'Grades', 2, yRange);
         }
         if (course.time_averages.length) {
             const yRange = calculateRange(course.time_averages);
-            createErrorBarChart(t, course.time_averages, 'avg', 'Time (s)', timeBarColour, 1, yRange);
+            createErrorBarChart(t, course.time_averages, 'avg', 'Time (s)', 1, yRange);
         }
     });
 
-    // Global charts
     if (overallGrades.length) {
         const yRange = calculateRange(overallGrades);
-        createErrorBarChart(document.getElementById('overall-grade-chart'), overallGrades, 'avg', 'Global Grades', gradeBarColour, 2, yRange);
+        createErrorBarChart(document.getElementById('overall-grade-chart'), overallGrades, 'avg', 'Global Grades', 2, yRange);
     }
     if (overallTimes.length) {
         const yRange = calculateRange(overallTimes);
-        createErrorBarChart(document.getElementById('overall-time-chart'), overallTimes, 'avg', 'Global Time (s)', timeBarColour, 1, yRange);
+        createErrorBarChart(document.getElementById('overall-time-chart'), overallTimes, 'avg', 'Global Time (s)', 1, yRange);
     }
 });

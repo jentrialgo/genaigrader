@@ -26,7 +26,7 @@ $(document).ready(function() {
                 exportOptions: {
                     columns: [0, 1, 2, 3, 4],
                     format: {
-                        body: function(data, row, column, node) {
+                        body: function(data) {
                             return data.replace(/<[^>]*>/g, '').replace(/\?/g, '✓');
                         }
                     }
@@ -57,10 +57,10 @@ $(document).ready(function() {
                     doc.content[0].margin = [0, 0, 0, 15];
                     doc.content[1].layout = {
                         hLineWidth: function(i, node) { return (i === 0 || i === node.table.body.length) ? 2 : 1; },
-                        vLineWidth: function(i, node) { return 0; },
-                        hLineColor: function(i) { return '#3498db'; },
-                        paddingLeft: function(i) { return 5; },
-                        paddingRight: function(i) { return 5; }
+                        vLineWidth: function() { return 0; },
+                        hLineColor: function() { return '#3498db'; },
+                        paddingLeft: function() { return 5; },
+                        paddingRight: function() { return 5; }
                     };
                 }
             }
@@ -73,7 +73,6 @@ $(document).ready(function() {
             { className: 'dt-body-center', targets: [3,4] }
         ],
         language: {
-            url: '//cdn.datatables.net/plug-ins/1.13.7/i18n/en-US.json',
             buttons: {
                 csv: 'Export CSV',
                 pdf: 'Export PDF'
@@ -103,6 +102,8 @@ function deleteEvaluation(button) {
     }
 }
 
+const DEFAULT_MODEL_COLOR = JSON.parse(document.getElementById('default-model-color').textContent);
+
 const questionAnalyticsState = {
     questionOrder: [],
     modelMap: new Map(),
@@ -114,12 +115,21 @@ const questionAnalyticsState = {
     ]
 };
 
+// Global function to convert HEX colors to RGBA so all charts can use it
+const hexToRgba = (hex, alpha = 0.3) => {
+    if (!hex || typeof hex !== 'string' || !hex.startsWith('#')) {
+        hex = DEFAULT_MODEL_COLOR;
+    }
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return `rgba(${r},${g},${b},${alpha})`;
+};
+
 // Charts with confidence intervals
 document.addEventListener('DOMContentLoaded', function () {
     const modelAverages = JSON.parse(document.getElementById('model-averages-data').textContent);
     const timeAverages = JSON.parse(document.getElementById('time-averages-data').textContent);
-    const gradeBarColour = '59,130,246';
-    const timeBarColour = '255,99,132';
 
     const calculateRange = (data) => {
         const yValues = data.flatMap(d => [d.yMin, d.avg, d.yMax]);
@@ -129,7 +139,6 @@ document.addEventListener('DOMContentLoaded', function () {
         const globalMin = Math.min(...yValues);
         const globalMax = Math.max(...yValues);
 
-
         if (globalMin === globalMax) {
             const buffer = Math.abs(globalMin) * 0.5 || 1;
             return {
@@ -138,36 +147,42 @@ document.addEventListener('DOMContentLoaded', function () {
             };
         }
 
-
         const rangeBuffer = (globalMax - globalMin) * 0.2;
         return {
             min: globalMin - rangeBuffer,
             max: globalMax + rangeBuffer
         };
     }
-
-    const createErrorBarChart = (canvas, data, field, title, color, decimals = 2) => {
+    const createErrorBarChart = (canvas, data, field, title, decimals = 2) => {
         const yRange = calculateRange(data);
+        const labels = data.map(d => d.model__description);
 
-        new Chart(canvas, {
+        const bgColors = data.map(item => hexToRgba(item.model_color || DEFAULT_MODEL_COLOR, 0.3));
+        const borderColors = data.map(item => item.model_color || DEFAULT_MODEL_COLOR);
+
+        const datasets = [{
+            label: title,
+            data: data.map(item => ({
+                x: item.model__description,
+                y: item[field],
+                yMin: item.yMin,
+                yMax: item.yMax
+            })),
+            backgroundColor: bgColors,
+            borderColor: borderColors,
+            borderWidth: 2,
+            borderRadius: 4,
+            errorBarWhiskerColor: '#cbd5e1',
+            errorBarColor: '#cbd5e1'
+        }];
+
+        if (canvas.chartInstance) canvas.chartInstance.destroy();
+
+        canvas.chartInstance = new Chart(canvas, {
             type: 'barWithErrorBars',
             data: {
-                labels: data.map(d => d.model__description),
-                datasets: [{
-                    label: title,
-                    data: data.map(item => ({
-                        x: item.model__description,
-                        y: item[field],
-                        yMin: item.yMin,
-                        yMax: item.yMax
-                    })),
-                    backgroundColor: `rgba(${color}, 0.3)`,
-                    borderColor: `rgba(${color}, 1)`,
-                    borderWidth: 1,
-                    borderRadius: 4,
-                    errorBarWhiskerColor: '#FFF',
-                    errorBarColor: '#FFF'
-                }]
+                labels,
+                datasets
             },
             options: {
                 responsive: true,
@@ -210,7 +225,6 @@ document.addEventListener('DOMContentLoaded', function () {
             modelAverages,
             'avg',
             'Grades',
-            gradeBarColour,
             2
         );
     }
@@ -221,7 +235,6 @@ document.addEventListener('DOMContentLoaded', function () {
             timeAverages,
             'avg',
             'Time (s)',
-            timeBarColour,
             1
         );
     }
@@ -231,7 +244,10 @@ function loadQuestionAnalytics(questionId, questionNumber) {
     const tbody = document.getElementById(`analyticsBody--${questionId}`);
     const table = document.getElementById(`questionAnalyticsTable--${questionId}`);
     tbody.innerHTML = '<tr><td colspan="3" class="analytics-state-cell">Loading data...</td></tr>';
-    table.style.display = 'table';
+    if (table) {
+        table.classList.remove('analytics-table-hidden');
+        table.style.display = 'table';
+    }
 
     fetch(`/question/${questionId}/analytics/`)
         .then(response => response.json())
@@ -244,13 +260,29 @@ function loadQuestionAnalytics(questionId, questionNumber) {
                 }
                 data.data.forEach(stat => {
                     registerQuestionAnalytics(stat, questionId, questionNumber);
-                    tbody.innerHTML += `
-                        <tr>
-                            <td><strong>${stat.model_name}</strong></td>
-                            <td>${stat.accuracy} %</td>
-                            <td>${stat.total_evaluations}</td>
-                        </tr>
-                    `;
+
+                    const row = document.createElement('tr');
+
+                    const nameCell = document.createElement('td');
+                    nameCell.className = 'analytics-model-cell';
+                    const colorDot = document.createElement('span');
+                    colorDot.className = 'analytics-model-dot';
+                    colorDot.style.backgroundColor = stat.model_color || DEFAULT_MODEL_COLOR;
+                    const nameText = document.createElement('span');
+                    nameText.textContent = stat.model_name;
+                    nameCell.appendChild(colorDot);
+                    nameCell.appendChild(nameText);
+
+                    const accuracyCell = document.createElement('td');
+                    accuracyCell.textContent = `${stat.accuracy} %`;
+
+                    const totalCell = document.createElement('td');
+                    totalCell.textContent = stat.total_evaluations;
+
+                    row.appendChild(nameCell);
+                    row.appendChild(accuracyCell);
+                    row.appendChild(totalCell);
+                    tbody.appendChild(row);
                 });
             } else {
                 tbody.innerHTML = `<tr><td colspan="3" class="analytics-state-error">Error: ${data.error}</td></tr>`;
@@ -259,6 +291,10 @@ function loadQuestionAnalytics(questionId, questionNumber) {
         .catch(error => {
             console.error("Error loading analytics:", error);
             tbody.innerHTML = '<tr><td colspan="3" class="analytics-state-error">Connection error.</td></tr>';
+            if (table) {
+                table.classList.remove('analytics-table-hidden');
+                table.style.display = 'table';
+            }
         })
         .finally(() => {
             questionAnalyticsState.pendingRequests -= 1;
@@ -278,6 +314,7 @@ function registerQuestionAnalytics(stat, questionId, questionNumber) {
         questionAnalyticsState.modelMap.set(modelId, {
             modelId,
             modelName: stat.model_name,
+            color: stat.model_color || DEFAULT_MODEL_COLOR,
             values: new Map(),
             totals: new Map()
         });
@@ -371,20 +408,18 @@ function renderQuestionAccuracyChart() {
                 return null;
             }
 
-            const color = questionAnalyticsState.colors[index % questionAnalyticsState.colors.length];
+            const color = model.color || questionAnalyticsState.colors[index % questionAnalyticsState.colors.length];
             const values = questionOrder.map(question => model.values.get(question.id) ?? null);
             const totals = questionOrder.map(question => model.totals.get(question.id) ?? 0);
 
             return {
                 label: model.modelName,
                 data: values,
+                backgroundColor: hexToRgba(color, 0.6),
                 borderColor: color,
-                backgroundColor: `${color}22`,
-                tension: 0.25,
-                spanGaps: true,
-                pointRadius: 4,
-                pointHoverRadius: 6,
-                totals
+                borderWidth: 1,
+                borderRadius: 4,
+                totals: totals
             };
         })
         .filter(Boolean);
@@ -404,7 +439,7 @@ function renderQuestionAccuracyChart() {
             responsive: true,
             maintainAspectRatio: false,
             interaction: {
-                mode: 'nearest',
+                mode: 'index',
                 intersect: false
             },
             plugins: {
@@ -414,12 +449,12 @@ function renderQuestionAccuracyChart() {
                 tooltip: {
                     callbacks: {
                         label(context) {
-                            const accuracy = context.parsed.y;
+                            const accuracy = context.raw;
                             const total = context.dataset.totals[context.dataIndex];
                             if (accuracy === null || Number.isNaN(accuracy)) {
                                 return `${context.dataset.label}: no data`;
                             }
-                            return `${context.dataset.label}: ${accuracy.toFixed(2)}% (${total} evals)`;
+                            return `${context.dataset.label}: ${Number(accuracy).toFixed(2)}% (${total} evals)`;
                         }
                     }
                 }
@@ -427,7 +462,7 @@ function renderQuestionAccuracyChart() {
             scales: {
                 x: {
                     ticks: { color: '#94a3b8' },
-                    grid: { color: 'rgba(51, 65, 85, 0.35)' }
+                    grid: { display: false }
                 },
                 y: {
                     min: 0,
@@ -436,7 +471,7 @@ function renderQuestionAccuracyChart() {
                         color: '#94a3b8',
                         callback: value => `${value}%`
                     },
-                    grid: { color: 'rgba(51, 65, 85, 0.5)' }
+                    grid: { color: 'rgba(51, 65, 85, 0.2)' }
                 }
             }
         }

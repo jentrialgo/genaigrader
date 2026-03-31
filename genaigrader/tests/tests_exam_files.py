@@ -6,7 +6,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from django.test.client import RequestFactory
 
-from genaigrader.models import Course, Exam, Question
+from genaigrader.models import Course, Exam, Family, Model, Question
 from genaigrader.services.exam_service import process_exam_file
 from genaigrader.views.evaluate_views import upload_file
 
@@ -55,6 +55,10 @@ class UploadFileTestCase(TestCase):
         self.factory = RequestFactory()
         self.user = self._create_user()
         self.course = Course.objects.create(name="Test Course", user=self.user)
+        self.family = Family.objects.create(name="Test")
+        self.ai_model = Model.objects.create(
+            description="Test Model", family=self.family, parameter_count=1
+        )
 
     def _create_user(self):
         return User.objects.create_user(username="testuser", password="password")
@@ -64,7 +68,7 @@ class UploadFileTestCase(TestCase):
         post_data = {
             "course_choice": "existing",
             "course_id": str(self.course.id),
-            "model": "Test Model",
+            "model": self.ai_model.id,
         }
         post_data.update(extra_post_data)
 
@@ -208,7 +212,7 @@ class UploadFileTestCase(TestCase):
             {
                 "course_choice": "existing",
                 "course_id": str(other_course.id),
-                "model": "Test Model",
+                "model": self.ai_model.id,
             },
         )
         request.FILES["file"] = SimpleUploadedFile(

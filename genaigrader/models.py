@@ -1,8 +1,8 @@
-import re
-
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.db import models
+
+from genaigrader.services import model_service
 
 
 class Course(models.Model):
@@ -48,11 +48,33 @@ class Question(models.Model):
         return self.statement[:50]
 
 
+class Family(models.Model):
+    id = models.AutoField(primary_key=True)
+    name = models.CharField(max_length=100, unique=True)
+    base_color = models.CharField(max_length=7, null=True, blank=True)
+
+    def __str__(self):
+        return self.name
+
+
 class Model(models.Model):
     id = models.AutoField(primary_key=True)
     description = models.CharField(max_length=255)
 
-    # Optional fields for external models
+    family = models.ForeignKey(
+        Family, on_delete=models.SET_NULL, null=True, blank=True, related_name="models"
+    )
+    color = models.CharField(
+        max_length=7,
+        null=True,
+        blank=True,
+        help_text="Hex color code for the model",
+    )
+    parameter_count = models.FloatField(
+        null=True, blank=True, help_text="Model size in billions of parameters"
+    )
+    version = models.CharField(max_length=50, null=True, blank=True)
+
     api_url = models.URLField(max_length=500, null=True, blank=True)
     api_key = models.CharField(max_length=255, null=True, blank=True)
     user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
@@ -66,44 +88,30 @@ class Model(models.Model):
                 "The 'user' field should only be used for external models"
             )
 
+    def save(self, *args, **kwargs):
+        needs_color_refresh = model_service.needs_model_color_refresh(self)
+        missing_core_info = not self.family or needs_color_refresh
+
+        if self.is_external:
+            needs_classification = missing_core_info or not self.version
+        else:
+            needs_classification = missing_core_info or self.parameter_count is None
+
+        if needs_classification:
+            model_service.auto_classify_and_color(self)
+
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return self.description
 
     @property
+    def family_name(self):
+        return self.family.name if self.family else "Unknown"
+
+    @property
     def is_external(self):
         return self.api_url is not None and self.api_key is not None
-
-    def _extract_model_info(self):
-        """
-        Extract model family, size, and variant information from local model name.
-        Returns (family, size_value, size_unit, variant, is_external)
-        """
-        model_name = self.description
-
-        if self.is_external:
-            return (model_name, 0, "", "", True)
-
-        # Local models pattern: family:size or family:size-variant
-        # Examples: gemma3:1b, deepseek-r1:7b, phi4-mini-reasoning, llama3.2:3b
-
-        # Handle models without size (like phi4-mini-reasoning)
-        if ":" not in model_name:
-            return (model_name, 0, "", "", False)
-
-        family, size_part = model_name.split(":", 1)
-
-        # Extract size and variant from size_part
-        # Examples: "1b", "7b", "1b-it-qat", "27b-it-qat"
-        size_match = re.match(r"^(\d+(?:\.\d+)?)([a-zA-Z]*)(.*)", size_part)
-
-        if size_match:
-            size_value = float(size_match.group(1))
-            size_unit = size_match.group(2)
-            variant = size_match.group(3)
-            return (family, size_value, size_unit, variant, False)
-        else:
-            # If no size match, treat entire size_part as variant
-            return (family, 0, "", size_part, False)
 
     def get_sort_key(self):
         """
@@ -115,9 +123,12 @@ class Model(models.Model):
             # External models go last, sorted alphabetically
             return (1, self.description.lower())
         else:
+
             # Local models go first
             # Extract model information from name for local models
-            family, size_value, size_unit, variant, _ = self._extract_model_info()
+            family, size_value, size_unit, variant, _ = (
+                model_service.extract_model_info(self.description, self.is_external)
+            )
             # Sort by: family, size_value, size_unit (b < others), variant
             size_unit_priority = 0 if size_unit.lower() == "b" else 1
             return (
