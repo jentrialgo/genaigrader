@@ -16,7 +16,7 @@
       {% if user.is_authenticated %}
         <span>Hello, {{ user.username }}!</span>
           <a class="boton" href="{% url 'home' %}">Home</a>
-          <a class="boton" href="{% url 'evaluate' %}">Evaluate</a>
+          <a class="boton" href="{% url 'evaluate' %}">Upload Exam</a>
           <a class="boton" href="{% url 'batch_evaluations' %}">Batch evaluate</a>
           <a class="boton" href="{% url 'analysis' %}">Results</a>
           <a class="boton" href="{% url 'course' %}">Courses</a>       

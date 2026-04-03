@@ -1,6 +1,7 @@
 <div class="form-section">
   <label for="model-select">AI Model:</label>
   <select id="model-select" name="model">
+    <option value="" selected>-- Upload without evaluating --</option>
     <optgroup label="Local Models">
       {% for model in local_models %}
         <option value="{{ model.description }}">{{ model.description }}</option>
