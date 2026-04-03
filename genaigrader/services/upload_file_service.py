@@ -75,7 +75,10 @@ def handle_file_upload(request):
         user = request.user
 
         # Step 2: model validation
-        llm = validate_model(request)
+        model_name = request.POST.get("model", "")
+        llm = None
+        if model_name:
+            llm = validate_model(request)
 
         # Step 3: block if exam name already exists in this course
         existing_exam = find_exam_name_conflict(uploaded_file, course, user, request)
@@ -99,18 +102,21 @@ def handle_file_upload(request):
             uploaded_file, course, request.user, request, questions_data
         )
 
-        # Step 6: stream LLM response
-        user_prompt = request.POST.get("user_prompt", "")
-        notes = request.POST.get("notes", "")
-        stream = stream_responses(
-            Question.objects.filter(exam=exam),
-            user_prompt,
-            llm,
-            len(questions_data),
-            exam,
-            notes,
-        )
-        return StreamingHttpResponse(stream, content_type="text/event-stream")
+        # Step 6: stream LLM response or return success for pure upload
+        if llm:
+            user_prompt = request.POST.get("user_prompt", "")
+            notes = request.POST.get("notes", "")
+            stream = stream_responses(
+                Question.objects.filter(exam=exam),
+                user_prompt,
+                llm,
+                len(questions_data),
+                exam,
+                notes,
+            )
+            return StreamingHttpResponse(stream, content_type="text/event-stream")
+
+        return JsonResponse({"status": "success", "exam_id": exam.id})
 
     except Exception as e:
         return HttpResponse(f"Error: {str(e)}", status=400)

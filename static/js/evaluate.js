@@ -42,6 +42,7 @@ $(document).ready(function () {
   toggleCourseInputs();
   $('input[name="course_choice"]').change(toggleCourseInputs);
 
+
   examNameInput.on("input", clearExamNameError);
 
   function buildDuplicateExamMessage(payload) {
@@ -92,6 +93,16 @@ $(document).ready(function () {
           }
           return handleErrorResponse(response, "There was an error processing the file.");
         }
+
+        const contentType = response.headers.get("content-type");
+        if (contentType && contentType.indexOf("application/json") !== -1) {
+          return response.json().then((data) => {
+            if (data.status === "success") {
+              window.location.href = `/exam/${data.exam_id}/`;
+            }
+          });
+        }
+
         return handleStreamingResponse(response, updateUI);
       })
       .catch((error) => {
@@ -104,4 +115,5 @@ $(document).ready(function () {
         $("#exam-results").html(`<div class="error-message">${errorMessage}</div>`);
       });
   });
+
 });
