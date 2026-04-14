@@ -1,0 +1,17 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="{% static 'css/users.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="auth-shell">
+  <h2>Log Out</h2>
+  <form method="post" action="{% url 'account_logout' %}" id="auth-form" class="auth-form">
+    {% csrf_token %}
+    <p class="auth-text">Are you sure you want to log out?</p>
+    <button type="submit">Log Out</button>
+  </form>
+</div>
+{% endblock %}

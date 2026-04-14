@@ -1,19 +1,23 @@
 import json
 from unittest.mock import MagicMock, Mock, patch
 
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from django.test import Client, TestCase
 
 from genaigrader.models import Course, Evaluation, Exam, Model, QuestionEvaluation
 
 from ..services.stream_service import process_question, stream_responses
 
+User = get_user_model()
+
 
 class StreamServiceTest(TestCase):
     def setUp(self):
         self.client = Client()
-        self.user = User.objects.create_user(username="testuser", password="password")
-        self.client.login(username="testuser", password="password")
+        self.user = User.objects.create_user(
+            username="testuser", email="testuser@example.com", password="password"
+        )
+        self.client.force_login(self.user)
 
         # Create related data
         self.course = Course.objects.create(name="Test Course", user=self.user)

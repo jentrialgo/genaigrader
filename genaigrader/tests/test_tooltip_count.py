@@ -1,15 +1,19 @@
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from django.test import Client, TestCase
 from django.urls import reverse
 
 from genaigrader.models import Course, Evaluation, Exam, Model
 
+User = get_user_model()
+
 
 class TooltipCountTest(TestCase):
     def setUp(self):
         self.client = Client()
-        self.user = User.objects.create_user(username="testuser", password="password")
-        self.client.login(username="testuser", password="password")
+        self.user = User.objects.create_user(
+            username="testuser", email="testuser@example.com", password="password"
+        )
+        self.client.force_login(self.user)
 
         # Create related data
         course = Course.objects.create(name="Test Course", user=self.user)

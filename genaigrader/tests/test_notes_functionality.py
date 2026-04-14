@@ -1,16 +1,20 @@
 from unittest.mock import Mock, patch
 
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from django.test import TestCase
 
 from genaigrader.models import Course, Evaluation, Exam, Model, Question, QuestionOption
 from genaigrader.services.stream_service import stream_responses
 
+User = get_user_model()
+
 
 class NotesfunctionalityTest(TestCase):
     def setUp(self):
         """Set up test data"""
-        self.user = User.objects.create_user(username="testuser", password="password")
+        self.user = User.objects.create_user(
+            username="testuser", email="testuser@example.com", password="password"
+        )
         self.course = Course.objects.create(name="Test Course", user=self.user)
         self.exam = Exam.objects.create(
             course=self.course, description="Test Exam", user=self.user

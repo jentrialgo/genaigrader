@@ -1,0 +1,11 @@
+Hello {{ user_display }},
+
+Please confirm your email address to complete your registration at GenAI Grader.
+
+Follow this link to verify your account:
+{{ activate_url }}
+
+If you did not request this, you can safely ignore this email.
+
+Best,
+The GenAI Grader Team

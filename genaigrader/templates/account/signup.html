@@ -1,0 +1,50 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load socialaccount %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="{% static 'css/users.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="auth-shell">
+  <h2>Sign Up</h2>
+  <form method="post" action="{% url 'account_signup' %}" id="auth-form" class="auth-form" novalidate>
+    {% csrf_token %}
+
+    {% if form.non_field_errors %}
+      <div class="auth-errors" role="alert">{{ form.non_field_errors }}</div>
+    {% endif %}
+
+    {% for field in form.visible_fields %}
+      <div class="auth-field">
+        <label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} *{% endif %}</label>
+        {{ field }}
+        {% if field.help_text %}
+          <small class="auth-help">{{ field.help_text }}</small>
+        {% endif %}
+        {% if field.errors %}
+          <div class="auth-errors" role="alert">{{ field.errors }}</div>
+        {% endif %}
+      </div>
+    {% endfor %}
+
+    {% if redirect_field_value %}
+      <input type="hidden" name="{{ redirect_field_name }}" value="{{ redirect_field_value }}">
+    {% endif %}
+    <button type="submit">Register</button>
+  </form>
+
+  {% if GOOGLE_OAUTH_ENABLED %}
+    <p class="auth-divider">
+      <strong>Or sign up with:</strong>
+    </p>
+    <div class="social-auth-buttons">
+      <form method="post" action="{% provider_login_url 'google' %}">
+        {% csrf_token %}
+        <button type="submit" class="boton boton-google">Sign up with Google</button>
+      </form>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

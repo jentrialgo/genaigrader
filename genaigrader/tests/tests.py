@@ -1,15 +1,19 @@
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from django.test import Client, TestCase
 from django.urls import reverse
 
 from genaigrader.models import Course
 from genaigrader.services.confidence_service import confidence_interval
 
+User = get_user_model()
+
 
 class ExamViewTest(TestCase):
     def setUp(self):
         self.client = Client()
-        self.user = User.objects.create_user(username="testuser", password="12345")
+        self.user = User.objects.create_user(
+            username="testuser", email="testuser@example.com", password="12345"
+        )
         # Crea datos de prueba
         self.course = Course.objects.create(name="Matemáticas", user=self.user)
 

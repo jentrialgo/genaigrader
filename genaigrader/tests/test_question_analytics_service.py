@@ -1,4 +1,4 @@
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from django.test import TestCase
 
 from genaigrader.models import (
@@ -12,11 +12,15 @@ from genaigrader.models import (
 )
 from genaigrader.services.question_analytics_service import calculate_question_analytics
 
+User = get_user_model()
+
 
 class QuestionAnalyticsServiceTest(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(
-            username="analytics_user", password="secret"
+            username="analytics_user",
+            email="analytics_user@example.com",
+            password="secret",
         )
         self.course = Course.objects.create(name="Course", user=self.user)
         self.exam = Exam.objects.create(

@@ -16,8 +16,7 @@ Including another URLconf
 """
 
 from django.contrib import admin
-from django.contrib.auth import views as auth_views
-from django.urls import path
+from django.urls import include, path
 
 from genaigrader.views.analysis_view import analysis_view
 from genaigrader.views.api_views import (
@@ -27,7 +26,6 @@ from genaigrader.views.api_views import (
     pull_model,
     update_model,
 )
-from genaigrader.views.auth_views import signup
 from genaigrader.views.batch_evaluations_view import batch_evaluations_view
 from genaigrader.views.course_views import (
     course_view,
@@ -45,23 +43,15 @@ from genaigrader.views.exam_details_view import (
     question_analytics,
 )
 from genaigrader.views.home_view import home_view
+from genaigrader.views.user_settings_view import UserSettingsView
 
 urlpatterns = [
     path("admin/", admin.site.urls),
-    path(
-        "accounts/login/",
-        auth_views.LoginView.as_view(template_name="registration/login.html"),
-        name="login",
-    ),
-    path(
-        "accounts/logout/",
-        auth_views.LogoutView.as_view(next_page="login"),
-        name="logout",
-    ),
-    path("accounts/signup/", signup, name="signup"),
+    path("accounts/", include("allauth.urls")),
     path("evaluate/", evaluate_view, name="evaluate"),
     path("course/", course_view, name="course"),
     path("upload/", upload_file, name="upload_file"),
+    path("settings/", UserSettingsView.as_view(), name="user_settings"),
     path("exam/<int:exam_id>/", exam_detail, name="exam_detail"),
     path(
         "question/<int:question_id>/analytics/",
