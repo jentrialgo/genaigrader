@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}GenAI Grader - Settings{% endblock %}
+{% block header %}GenAI Grader - Settings{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/profile_settings.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="container">
+  <h2>Profile Settings</h2>
+  <p class="settings-subtitle">Manage your personal information and account preferences.</p>
+
+  {% if is_legacy %}
+    <div class="legacy-banner" role="alert" aria-live="polite">
+      <p>Your account is using a temporary email address. Please update it to a valid email so you can keep full access and receive verification messages.</p>
+    </div>
+  {% endif %}
+
+  <form method="post" id="profile-settings-form">
+    {% csrf_token %}
+
+    {% if form.non_field_errors %}
+      <div class="field-error" style="text-align: center; margin-bottom: 1rem;">
+        {{ form.non_field_errors }}
+      </div>
+    {% endif %}
+
+    <div class="form-group">
+      <label for="id_username">Username</label>
+      <input type="text" name="username" id="id_username" value="{% firstof form.username.value user.username %}" readonly disabled aria-readonly="true">
+      {% if form.username.errors %}
+        <div class="field-error">{{ form.username.errors.0 }}</div>
+      {% endif %}
+    </div>
+
+    <div class="form-group">
+      <label for="id_first_name">First name</label>
+      <input type="text" name="first_name" id="id_first_name" value="{% firstof form.first_name.value user.first_name %}" autocomplete="given-name">
+      {% if form.first_name.errors %}
+        <div class="field-error">{{ form.first_name.errors.0 }}</div>
+      {% endif %}
+    </div>
+
+    <div class="form-group">
+      <label for="id_last_name">Last name</label>
+      <input type="text" name="last_name" id="id_last_name" value="{% firstof form.last_name.value user.last_name %}" autocomplete="family-name">
+      {% if form.last_name.errors %}
+        <div class="field-error">{{ form.last_name.errors.0 }}</div>
+      {% endif %}
+    </div>
+
+    <div class="form-group">
+      <label for="id_email">Email address</label>
+      <input type="email" name="email" id="id_email" value="{% firstof form.email.value user.email %}" autocomplete="email" {% if form.email.field.disabled %}readonly disabled aria-readonly="true"{% endif %}>
+      {% if form.email.errors %}
+        <div class="field-error">{{ form.email.errors.0 }}</div>
+      {% elif form.email.help_text %}
+        <p class="field-help">{{ form.email.help_text }}</p>
+      {% endif %}
+    </div>
+
+    <button type="submit" class="btn-primary" id="save-settings-btn" disabled>Save changes</button>
+  </form>
+
+  <section class="security-section">
+    <h3>Security</h3>
+    <p style="color: var(--text-light); margin-bottom: 1.5rem;">Update your password using the secure account flow.</p>
+    <a href="{% url 'account_change_password' %}" class="btn-primary">Change password</a>
+  </section>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+  <script src="{% static 'js/profile_settings.js' %}"></script>
+{% endblock %}

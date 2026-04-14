@@ -180,9 +180,6 @@ input[type="file"]::file-selector-button:hover {
   to { transform: rotate(360deg); }
 }
 
-#progress-bar {
-  height: 1rem;
-}
 
 #exam-results {
   max-width: 860px;

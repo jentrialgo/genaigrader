@@ -46,6 +46,13 @@ body {
   text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
 }
 
+.menu-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
 .boton {
   padding: 0.6rem 1.2rem;
   border-radius: 8px;
@@ -83,51 +90,38 @@ body {
   left: 100%;
 }
 
-/* Botones principales */
-.boton[href*="login"],
-.boton[href*="signup"] {
+/* Botones por clase para acciones del menú */
+.boton.auth-action {
   background: var(--primary-color);
   color: var(--text-color);
   border: 2px solid var(--primary-color);
 }
 
-.boton[href*="login"]:hover,
-.boton[href*="signup"]:hover {
+.boton.auth-action:hover {
   background: #2563eb;
   border-color: #2563eb;
 }
 
-/* Botones de navegación */
-.boton[href*="/"],
-.boton[href*="evaluate"],
-.boton[href*="course"],
-.boton[href*="analysis"],
-.boton[href*="batch-evaluations"],
-.boton[href*="api"] {
+.boton.nav-action {
   background: transparent;
   color: var(--text-color);
   border: 2px solid var(--primary-color);
   box-shadow: var(--shadow-sm);
 }
 
-.boton[href*="/"]:hover,
-.boton[href*="evaluate"]:hover,
-.boton[href*="course"]:hover,
-.boton[href*="analysis"]:hover,
-.boton[href*="batch-evaluations"]:hover,
-.boton[href*="api"]:hover {
+.boton.nav-action:hover {
   background: var(--primary-color);
   color: var(--text-color);
 }
 
 /* Botón de logout */
-.boton[type="submit"] {
+.boton.logout-action {
   background: var(--accent-color);
   color: var(--text-color) !important;
   border: 2px solid var(--accent-color);
 }
 
-.boton[type="submit"]:hover {
+.boton.logout-action:hover {
   background: #3b82f6;
   border-color: #3b82f6;
 }
@@ -145,7 +139,7 @@ body {
 #menu-bar span {
   color: var(--text-light);
   font-size: 0.9rem;
-  margin-right: 1rem;
+  margin-right: 0.2rem;
   padding: 0.5rem 1rem;
   background: var(--background-dark);
   border-radius: 6px;
@@ -182,3 +176,78 @@ input, textarea, select {
   display: inline;
 }
 
+.messages-container {
+  max-width: 1200px;
+  margin: 1rem auto 0;
+  padding: 0 2rem;
+}
+
+.message {
+  margin: 0.5rem 0;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  background: var(--background-dark);
+}
+
+.message-error {
+  border-color: #ef4444;
+  color: #fecaca;
+}
+
+.message-warning {
+  border-color: #f59e0b;
+  color: #fde68a;
+}
+
+.message-success {
+  border-color: #22c55e;
+  color: #bbf7d0;
+}
+
+@media (max-width: 768px) {
+  #menu-bar {
+    padding: 0.9rem 1rem;
+    position: static;
+  }
+
+  #menu-bar h1 {
+    width: 100%;
+    font-size: 1.4rem;
+  }
+
+  .menu-actions {
+    width: 100%;
+    gap: 0.5rem;
+  }
+
+  .menu-actions .boton,
+  .menu-actions .inline-form,
+  .menu-actions .inline-form .boton {
+    width: 100%;
+    justify-content: center;
+  }
+
+  #menu-bar span {
+    width: 100%;
+    margin-right: 0;
+    text-align: center;
+    box-sizing: border-box;
+  }
+
+  .section {
+    margin: 1rem;
+    padding: 1rem;
+  }
+
+  .messages-container {
+    padding: 0 1rem;
+  }
+}
+
+@media (max-width: 420px) {
+  .boton {
+    font-size: 0.9rem;
+    padding: 0.55rem 0.9rem;
+  }
+}

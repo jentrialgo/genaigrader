@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Verify Your Email - GenAI Grader{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="{% static 'css/users.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="auth-shell">
+  <h2>Verify Your Email</h2>
+  <div class="auth-text">
+    <p>We have sent an email to you for verification. Follow the link provided to finalize the signup process.</p>
+    <p>Please contact us if you do not receive it within a few minutes.</p>
+  </div>
+</div>
+{% endblock %}

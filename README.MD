@@ -59,13 +59,14 @@ Before deploying to production, you **must** configure environment variables sec
 2.  **Update Sensitive Values**:
     Open `.env` and replace the placeholder values:
     ```dotenv
+    DJANGO_DB_ENGINE=postgres
     POSTGRES_DB=genaigrader
     POSTGRES_USER=genai_user
     POSTGRES_PASSWORD=<strong-random-password>
-    DATABASE_URL=postgres://genai_user:<strong-random-password>@db:5432/genaigrader
     OLLAMA_HOST=http://host.docker.internal:11434
     ```
-    * Generate a strong, random password for `POSTGRES_PASSWORD` and update `DATABASE_URL` accordingly.
+    * Generate a strong, random password for `POSTGRES_PASSWORD`.
+    * In production, the app reads `POSTGRES_*` variables directly (no `DATABASE_URL` required).
     * Never use the same password across environments.
     * For Linux hosts, if Ollama is running outside Docker, make sure it is reachable from containers (not only `127.0.0.1`).
 
@@ -86,12 +87,55 @@ Before deploying to production, you **must** configure environment variables sec
 
 ---
 
+## 🔐 OAuth Configuration (Google & OpenID Connect)
+
+GenAI Grader supports social authentication via Google OAuth and OpenID Connect. To enable these features:
+
+### Google OAuth Setup
+
+1.  **Get Credentials from Google Cloud Console**:
+    * Visit [Google Cloud Console](https://console.cloud.google.com/)
+    * Create a new project or select an existing one
+    * Configure OAuth consent screen and add your test users (if app is in testing mode)
+    * Enable Google Identity / create OAuth client in Google Auth Platform
+    * Create OAuth 2.0 credentials (Web application)
+    * Add your application URLs to authorized redirect URIs
+
+2.  **Update `.env` File**:
+    ```dotenv
+    GOOGLE_OAUTH_CLIENT_ID=your-client-id-here
+    GOOGLE_OAUTH_CLIENT_SECRET=your-client-secret-here
+    ```
+
+3.  **Verify in Docker**:
+    When you start Docker containers, the Google login button will appear on the login and signup pages.
+
+### Security Note: Social Login Uses POST
+
+Social login initiation is intentionally restricted to `POST` requests. The project keeps
+`SOCIALACCOUNT_LOGIN_ON_GET = False` to prevent crafted third-party `GET` links from silently
+starting OAuth flows without explicit user intent.
+
+### OpenID Connect (Optional)
+
+If you have an OIDC-compatible identity provider:
+
+```dotenv
+OIDC_SERVER_URL=https://your-provider/.well-known/openid-configuration
+OIDC_CLIENT_ID=your-client-id
+OIDC_CLIENT_SECRET=your-client-secret
+```
+
+
+
+---
+
 ## 🤖 Ollama & Hardware Acceleration
 
 * **CPU-Only by Default**: The containerized development Ollama runs on CPU, meaning lower performance.
 * **Enabling GPU (NVIDIA)**: If the host has an NVIDIA GPU, they must install the NVIDIA Container Toolkit and uncomment the deploy block in `Docker/docker-compose.dev.yml`.
 * **Running Ollama Outside Docker**: For maximum performance without Docker limits (like macOS Metal), they can run Ollama natively on the host and change `OLLAMA_HOST` in their `.env` file.
-* **Linux Host Networking Note**: If Ollama runs on the Linux host, do not keep it bound only to `127.0.0.1`. Use a reachable host address (for example Docker bridge IP such as `172.17.0.1`) and set `OLLAMA_HOST=http://<reachableost-ip>:11434` in . Another option is to set `OLLAMA_HOST=0.0.0.0` in the `.env`
+* **Linux Host Networking Note**: If Ollama runs on the Linux host, do not keep it bound only to `127.0.0.1`. Use a reachable host address (for example Docker bridge IP such as `172.17.0.1`) and set `OLLAMA_HOST=http://<reachable-host-ip>:11434` in `.env`. Another option is to set `OLLAMA_HOST=0.0.0.0` in the `.env`.
 
 ---
 
@@ -146,7 +190,7 @@ docker compose -f Docker/docker-compose.dev.yml exec web uv run python manage.py
 
 This command:
 * Creates an isolated test database
-* Executes all test files in the `genaigrader/tests/` directory
+* Executes all discovered tests across installed apps (for example, `genaigrader/tests/` and `users/tests/`)
 * Reports pass/fail status and coverage information
 
 ### Run Tests Manually (Host Machine)

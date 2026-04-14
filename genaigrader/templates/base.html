@@ -2,6 +2,8 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}GenAI Grader{% endblock %}</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{% static 'css/base.css' %}">
@@ -12,25 +14,35 @@
 <body>
   <div id="menu-bar">
     <h1>{% block header %}GenAI Grader{% endblock %}</h1>
-    <div>
+    <div class="menu-actions">
       {% if user.is_authenticated %}
         <span>Hello, {{ user.username }}!</span>
-          <a class="boton" href="{% url 'home' %}">Home</a>
-          <a class="boton" href="{% url 'evaluate' %}">Upload Exam</a>
-          <a class="boton" href="{% url 'batch_evaluations' %}">Batch evaluate</a>
-          <a class="boton" href="{% url 'analysis' %}">Results</a>
-          <a class="boton" href="{% url 'course' %}">Courses</a>       
-          <a class="boton" href="{% url 'api' %}">Models</a>
-          <form action="{% url 'logout' %}" method="post" style="display: inline;">
-            {% csrf_token %}
-            <button type="submit" class="boton">Logout</button>
+        <a class="boton nav-action" href="{% url 'home' %}">Home</a>
+        <a class="boton nav-action" href="{% url 'evaluate' %}">Upload Exam</a>
+        <a class="boton nav-action" href="{% url 'batch_evaluations' %}">Batch evaluate</a>
+        <a class="boton nav-action" href="{% url 'analysis' %}">Results</a>
+        <a class="boton nav-action" href="{% url 'course' %}">Courses</a>
+        <a class="boton nav-action" href="{% url 'api' %}">Models</a>
+          {% if "@genaigrader.local" in user.email %}
+                <a class="boton nav-action" href="{% url 'user_settings' %}">Settings</a>
+        {% endif %}
+        <form action="{% url 'account_logout' %}" method="post" class="inline-form">
+          {% csrf_token %}
+          <button type="submit" class="boton logout-action">Logout</button>
         </form>
       {% else %}
-        <a class="boton" href="{% url 'login' %}">Iniciar sesión</a>
-        <a class="boton" href="{% url 'signup' %}">Registrarse</a>
+        <a class="boton auth-action" href="{% url 'account_login' %}">Log In</a>
+        <a class="boton auth-action" href="{% url 'account_signup' %}">Sign Up</a>
       {% endif %}
-      </div>
+    </div>
   </div>
+  {% if messages %}
+    <div class="messages-container">
+      {% for message in messages %}
+        <div class="message message-{{ message.tags|default:'info' }}">{{ message }}</div>
+      {% endfor %}
+    </div>
+  {% endif %}
   <div class="section">
     {% block content %}{% endblock %}
   </div>

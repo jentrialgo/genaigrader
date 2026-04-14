@@ -14,6 +14,9 @@ import os
 from pathlib import Path
 
 import dj_database_url
+from django.core.exceptions import ImproperlyConfigured
+
+AUTH_USER_MODEL = "users.CustomUser"
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -47,12 +50,18 @@ FILE_UPLOAD_MAX_MEMORY_SIZE = 10485760  # 10 MB
 # Application definition
 
 INSTALLED_APPS = [
+    "users.apps.UsersConfig",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "allauth",
+    "allauth.account",
+    "allauth.socialaccount",
+    "allauth.socialaccount.providers.openid_connect",
+    "allauth.socialaccount.providers.google",
     "genaigrader",
 ]
 
@@ -63,6 +72,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "allauth.account.middleware.AccountMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
@@ -80,6 +90,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "mi_web.context_processors.auth_flags",
             ],
         },
     },
@@ -98,8 +109,30 @@ DATABASES = {
     }
 }
 
-if os.getenv("DATABASE_URL"):
+_database_url = os.getenv("DATABASE_URL", "").strip()
+_db_engine = os.getenv("DJANGO_DB_ENGINE", "").strip().lower()
+
+if _database_url:
     DATABASES["default"] = dj_database_url.config(conn_max_age=500)
+elif _db_engine in {"postgres", "postgresql"}:
+    _postgres_db = os.getenv("POSTGRES_DB", "").strip()
+    _postgres_user = os.getenv("POSTGRES_USER", "").strip()
+    _postgres_password = os.getenv("POSTGRES_PASSWORD", "")
+    if not all([_postgres_db, _postgres_user, _postgres_password]):
+        raise ImproperlyConfigured(
+            "POSTGRES_DB, POSTGRES_USER and POSTGRES_PASSWORD are required when "
+            "DJANGO_DB_ENGINE=postgres."
+        )
+
+    DATABASES["default"] = {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": _postgres_db,
+        "USER": _postgres_user,
+        "PASSWORD": _postgres_password,
+        "HOST": os.getenv("POSTGRES_HOST", "db"),
+        "PORT": os.getenv("POSTGRES_PORT", "5432"),
+        "CONN_MAX_AGE": 500,
+    }
 
 OLLAMA_API_URL = os.getenv("OLLAMA_HOST", "http://localhost:11434")
 
@@ -121,6 +154,104 @@ AUTH_PASSWORD_VALIDATORS = [
         "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
     },
 ]
+
+AUTHENTICATION_BACKENDS = [
+    "django.contrib.auth.backends.ModelBackend",
+    "allauth.account.auth_backends.AuthenticationBackend",
+]
+
+ACCOUNT_USER_MODEL_USERNAME_FIELD = "username"
+ACCOUNT_USER_MODEL_EMAIL_FIELD = "email"
+ACCOUNT_UNIQUE_EMAIL = True
+ACCOUNT_EMAIL_VERIFICATION = "mandatory"
+ACCOUNT_CONFIRM_EMAIL_ON_GET = True
+ACCOUNT_LOGIN_ON_EMAIL_CONFIRMATION = True
+ACCOUNT_LOGIN_METHODS = {"email", "username"}
+ACCOUNT_SIGNUP_FIELDS = ["username*", "email*", "password1*", "password2*"]
+ACCOUNT_EMAIL_SUBJECT_PREFIX = os.getenv("ACCOUNT_EMAIL_SUBJECT_PREFIX", "")
+ACCOUNT_ADAPTER = "users.adapters.AccountAdapter"
+SOCIALACCOUNT_ADAPTER = "users.adapters.SocialAccountAdapter"
+SOCIALACCOUNT_AUTO_SIGNUP = True
+
+EMAIL_BACKEND = os.getenv(
+    "DJANGO_EMAIL_BACKEND",
+    "django.core.mail.backends.console.EmailBackend",
+)
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "no-reply@genaigrader.local")
+EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.gmail.com")
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
+EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "True").strip().lower() in {
+    "true",
+    "1",
+    "yes",
+}
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
+
+OIDC_PROVIDER_ID = os.getenv("OIDC_PROVIDER_ID", "oidc")
+OIDC_PROVIDER_NAME = os.getenv("OIDC_PROVIDER_NAME", "OpenID Connect")
+
+
+def _sanitize_oidc_env(value: str) -> str:
+    cleaned = (value or "").strip()
+    lowered = cleaned.lower()
+    if not cleaned:
+        return ""
+    if cleaned.upper().startswith("CHANGE_ME_"):
+        return ""
+    if "your-oidc-provider" in lowered:
+        return ""
+    if lowered in {"your-client-id", "your-client-secret"}:
+        return ""
+    return cleaned
+
+
+OIDC_SERVER_URL = _sanitize_oidc_env(os.getenv("OIDC_SERVER_URL", ""))
+OIDC_CLIENT_ID = _sanitize_oidc_env(os.getenv("OIDC_CLIENT_ID", ""))
+OIDC_CLIENT_SECRET = _sanitize_oidc_env(os.getenv("OIDC_CLIENT_SECRET", ""))
+
+GOOGLE_OAUTH_CLIENT_ID = os.getenv("GOOGLE_OAUTH_CLIENT_ID", "")
+GOOGLE_OAUTH_CLIENT_SECRET = os.getenv("GOOGLE_OAUTH_CLIENT_SECRET", "")
+GOOGLE_OAUTH_ENABLED = bool(
+    GOOGLE_OAUTH_CLIENT_ID.strip() and GOOGLE_OAUTH_CLIENT_SECRET.strip()
+)
+
+_oidc_enabled = all([OIDC_SERVER_URL, OIDC_CLIENT_ID, OIDC_CLIENT_SECRET])
+SOCIALACCOUNT_PROVIDERS = {
+    "openid_connect": {
+        "APPS": (
+            [
+                {
+                    "provider_id": OIDC_PROVIDER_ID,
+                    "name": OIDC_PROVIDER_NAME,
+                    "client_id": OIDC_CLIENT_ID,
+                    "secret": OIDC_CLIENT_SECRET,
+                    "settings": {
+                        "server_url": OIDC_SERVER_URL,
+                    },
+                }
+            ]
+            if _oidc_enabled
+            else []
+        )
+    },
+    "google": (
+        {
+            "APP": {
+                "client_id": GOOGLE_OAUTH_CLIENT_ID,
+                "secret": GOOGLE_OAUTH_CLIENT_SECRET,
+            },
+            "SCOPE": ["openid", "profile", "email"],
+            "AUTH_PARAMS": {"access_type": "online"},
+        }
+        if GOOGLE_OAUTH_ENABLED
+        else {}
+    ),
+}
+
+# Security hardening: require an explicit POST to start social login.
+# This avoids third-party crafted GET links silently initiating OAuth flows.
+SOCIALACCOUNT_LOGIN_ON_GET = False
 
 
 # Internationalization
@@ -153,4 +284,4 @@ MEDIA_ROOT = BASE_DIR / "uploaded_files"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 LOGIN_REDIRECT_URL = "home"  # Redirect here after logging in
-LOGOUT_REDIRECT_URL = "login"  # Redirect here after logging out
+LOGOUT_REDIRECT_URL = "account_login"  # Redirect here after logging out

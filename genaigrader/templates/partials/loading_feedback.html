@@ -1,11 +1,9 @@
-<div id="loading-indicator" style="display: none; text-align: center;">
-    <div class="loading-spinner"></div>
+<div id="loading-indicator" class="loading-indicator-hidden loading-indicator-centered" aria-live="polite" aria-busy="true">
+    <div class="loading-spinner" aria-hidden="true"></div>
     <p>Processing... 🔄</p>
-    <div style="width: 100%; background-color: #eee; border-radius: 12px; margin-top: 1rem;">
-      <div id="progress-bar" style="width: 0%; height: 24px; background-color: #4caf50; border-radius: 10px; color: white; display: flex; align-items: center; justify-content: center; transition: width 0.5s ease;">
+    <div class="loading-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-label="Upload progress">
+      <div id="progress-bar" class="loading-progress-bar">
         0%
       </div>
     </div>
   </div>
-  <div id="exam-results"></div>
-  <div id="exam-details"></div>

@@ -1,7 +1,7 @@
 import json
 from unittest.mock import patch
 
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from django.test.client import RequestFactory
@@ -9,6 +9,8 @@ from django.test.client import RequestFactory
 from genaigrader.models import Course, Exam, Family, Model, Question
 from genaigrader.services.exam_service import process_exam_file
 from genaigrader.views.evaluate_views import upload_file
+
+User = get_user_model()
 
 VALID_EXAM_FILE_CONTENT = """
 What's the PATH?
@@ -61,7 +63,9 @@ class UploadFileTestCase(TestCase):
         )
 
     def _create_user(self):
-        return User.objects.create_user(username="testuser", password="password")
+        return User.objects.create_user(
+            username="testuser", email="testuser@example.com", password="password"
+        )
 
     def _mock_request(self, file_content, file_name="test.txt", **extra_post_data):
         """Create a mock request with the necessary parameters."""

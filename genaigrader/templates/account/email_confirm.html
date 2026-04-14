@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Confirm Email - GenAI Grader{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="{% static 'css/users.css' %}">
+  <link rel="stylesheet" href="{% static 'css/email_confirm.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="auth-page-centered">
+  <div class="auth-shell">
+    <h2>Confirm Email</h2>
+
+    {% if messages %}
+      <div class="auth-inline-messages" role="status" aria-live="polite">
+        {% for message in messages %}
+          <div class="auth-inline-message">{{ message }}</div>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    {% if confirmation %}
+      <p class="auth-text">Please confirm that <a href="mailto:{{ confirmation.email_address.email }}">{{ confirmation.email_address.email }}</a> is an email address for user {{ confirmation.email_address.user.username }}.</p>
+
+      <form method="post" action="{% url 'account_confirm_email' confirmation.key %}" class="auth-form">
+        {% csrf_token %}
+        <button type="submit">Confirm</button>
+      </form>
+    {% else %}
+      <p class="auth-text">This email confirmation link expired or is invalid.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
