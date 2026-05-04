@@ -1,34 +1,40 @@
 #!/bin/bash
 
-# === CONFIGURATION ===
+# Configuration
 SESSION_NAME="genaigrader"
-PORT=9898
-PROJECT_DIR="$HOME/genaigrader"
+PROJECT_DIR="/home/joaquin/genaigrader-jentrialgo"
+GUNICORN_PID_FILE="$PROJECT_DIR/gunicorn.pid"
 ENV_FILE="$PROJECT_DIR/.env.django"
-GUNICORN_SOCKET="127.0.0.1:$PORT"
 GUNICORN_APP="mi_web.wsgi:application"
+GUNICORN_SOCKET="127.0.0.1:9898"
 SETTINGS_MODULE="mi_web.settings_ngrok"
 LOGFILE="gunicorn.log"
 
-# Remove previous gunicorn PID file if any
-rm -f gunicorn.pid
-
-# Create tmux session if not exists
-tmux has-session -t "$SESSION_NAME" 2>/dev/null
-if [ $? != 0 ]; then
-    echo "🖥️  Creating tmux session '$SESSION_NAME'..."
-    tmux new-session -d -s "$SESSION_NAME"
-    echo "✅ Session '$SESSION_NAME' created. To attach, run: tmux attach -t $SESSION_NAME"
-    echo "To detach, press Ctrl+b then d."
+# Stop gunicorn if running
+if [ -f "$GUNICORN_PID_FILE" ]; then
+    PID=$(cat "$GUNICORN_PID_FILE")
+    echo "🛑 Stopping gunicorn (PID: $PID)..."
+    kill $PID && rm -f "$GUNICORN_PID_FILE"
+    echo "✅ Gunicorn stopped."
+    sleep 2
+else
+    echo "ℹ️ Gunicorn PID not found. Attempting to pkill gunicorn..."
+    pkill gunicorn
 fi
 
-# Navigate to project directory
-tmux send-keys -t "$SESSION_NAME" "cd $PROJECT_DIR" C-m
+# Reload environment and restart gunicorn inside tmux session
+echo "🚀 Restarting gunicorn in tmux session '$SESSION_NAME'..."
 
-# Start ngrok tunnels in background
-tmux send-keys -t "$SESSION_NAME" "ngrok start --all > /dev/null &" C-m
-echo "🔄 Starting ngrok tunnels..."
-sleep 5
+tmux has-session -t "$SESSION_NAME" 2>/dev/null
+if [ $? != 0 ]; then
+    echo "❌ Tmux session '$SESSION_NAME' not found. Please run start_genaigrader.sh first."
+    exit 1
+fi
+
+echo "📦 Collecting static files..."
+cd $PROJECT_DIR
+set -a; source $ENV_FILE; set +a
+uv run python manage.py collectstatic --noinput --clear
 
 # Retrieve public ngrok URL
 for i in {1..10}; do
@@ -54,23 +60,14 @@ export DJANGO_ALLOWED_HOSTS="$NGROK_URL,localhost"
 EOF
 cat "$PROJECT_DIR/.env.django.base" >> "$ENV_FILE"
 
-# Start ollama inside tmux
-echo "🧠 Starting Ollama..."
-tmux send-keys -t "$SESSION_NAME" "ollama serve > ollama.log 2>&1 & echo \$! > ollama.pid" C-m
-sleep 2
-echo "✅ Ollama started (PID saved in ollama.pid)."
-
-# Run collectstatic
+# Send commands to tmux to restart gunicorn
+tmux send-keys -t "$SESSION_NAME" "cd $PROJECT_DIR" C-m
 tmux send-keys -t "$SESSION_NAME" "set -a; source $ENV_FILE; set +a" C-m
-tmux send-keys -t "$SESSION_NAME" "uv run python manage.py collectstatic --noinput --settings=$SETTINGS_MODULE" C-m
-
-# Start gunicorn with WhiteNoise for static files
 tmux send-keys -t "$SESSION_NAME" "uv run gunicorn $GUNICORN_APP \
     --bind $GUNICORN_SOCKET \
     --log-file $LOGFILE \
     --pid gunicorn.pid \
     --timeout 6000 \
-    --env DJANGO_SETTINGS_MODULE=$SETTINGS_MODULE > debug.log 2>&1 &" C-m
+    --env DJANGO_SETTINGS_MODULE=$SETTINGS_MODULE > debug_output.log 2>&1 &" C-m
 
-echo "🟢 App running at: https://$NGROK_URL"
-echo "📦 tmux session: $SESSION_NAME"
+echo "✅ Gunicorn restart command sent to tmux session '$SESSION_NAME'."
