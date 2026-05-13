@@ -6,7 +6,6 @@ from django.contrib.auth.decorators import login_required
 from django.db.models import Count, Q
 from django.http import StreamingHttpResponse
 from django.shortcuts import render
-from django.views.decorators.csrf import csrf_exempt
 
 from genaigrader.llm_api import LlmApi
 from genaigrader.models import Course, Exam, Model
@@ -135,13 +134,17 @@ def batch_stream(
         try:
             eval_count += 1
             subject_name = getattr(exam.course, "name", "")
-            progress_msg = (
-                f"Eval {eval_count}/{total_tasks} - "
-                f"Model: <b>{model.description}</b> Subject: <b>{subject_name}</b> "
-                f"Exam: <b>{exam.description}</b> Repetition: {rep}/{repetitions}"
-            )
-            logging.info(f"Progress: {progress_msg}")
-            yield f"data: {json.dumps({'progress': progress_msg})}\n\n"
+            progress = {
+                "eval_count": eval_count,
+                "total_tasks": total_tasks,
+                "model": model.description,
+                "subject": subject_name,
+                "exam": exam.description,
+                "rep": rep,
+                "repetitions": repetitions,
+            }
+            logging.info(f"Progress: {progress}")
+            yield f"data: {json.dumps({'progress': progress})}\n\n"
 
             responses = []
             for chunk in stream_responses(
@@ -155,7 +158,7 @@ def batch_stream(
             if summary:
                 yield f"data: {json.dumps({'eval_result': summary})}\n\n"
         except Exception as e:
-            error_msg = f"Error during {progress_msg}: {str(e)}"
+            error_msg = f"Error during Eval {eval_count}/{total_tasks} - Model: {model.description} Subject: {subject_name} Exam: {exam.description} Repetition: {rep}/{repetitions}: {str(e)}"
             logging.warning(error_msg)
             yield f"data: {json.dumps({'error': error_msg})}\n\n"
 
@@ -205,7 +208,6 @@ def handle_batch_evaluations_post(request, user, exams, models):
 
 
 @login_required
-@csrf_exempt
 def batch_evaluations_view(request):
     """
     Django view for handling batch evaluations. Supports GET for rendering the form

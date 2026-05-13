@@ -39,7 +39,7 @@ def update_course(request, course_id):
         return JsonResponse({"status": "success"})
     except Course.DoesNotExist:
         return JsonResponse({"status": "error"}, status=404)
-    except Exception as e:
+    except (ValueError, TypeError, ValidationError) as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=400)
 
 
@@ -52,7 +52,7 @@ def delete_course(request, course_id):
         return JsonResponse({"status": "success"})
     except Course.DoesNotExist:
         return JsonResponse({"status": "error"}, status=404)
-    except Exception as e:
+    except (ValueError, TypeError, ValidationError) as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=400)
 
 
@@ -69,7 +69,7 @@ def update_exam(request, exam_id):
         return JsonResponse({"status": "success"})
     except Exam.DoesNotExist:
         return JsonResponse({"status": "error"}, status=404)
-    except Exception as e:
+    except (ValueError, TypeError, ValidationError) as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=400)
 
 
@@ -84,7 +84,7 @@ def delete_exam(request, exam_id):
         return JsonResponse({"status": "success"})
     except Exam.DoesNotExist:
         return JsonResponse({"status": "error"}, status=404)
-    except Exception as e:
+    except (ValueError, TypeError, ValidationError) as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=400)
 
 

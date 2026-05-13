@@ -3,22 +3,30 @@
  * @param {string} progressStr - The progress string to parse.
  * @returns {object|null} An object with parsed progress fields, or null if parsing fails.
  */
-function parseProgress(progressStr) {
-  // Format: Eval x/y - Model: ... Subject: ... Exam: ... Repetition: a/b
-  const progressRegex = /^Eval (\d+)\/(\d+) - Model: (.*?) Subject: (.*?) Exam: (.*?) Repetition: (\d+)\/(\d+)$/;
-  const match = progressStr.match(progressRegex);
-  if (!match) return null;
-  return {
-    currentEval: parseInt(match[1], 10),
-    totalEval: parseInt(match[2], 10),
-    model: match[3],
-    subject: match[4],
-    exam: match[5],
-    repetition: match[6],
-    totalReps: match[7],
-    evalMsg: `Eval ${match[1]}/${match[2]}`,
-    detailMsg: `Evaluating <b>${match[3]}</b> on <b>${match[4]}</b> with <b>${match[5]}</b> (Repetition ${match[6]}/${match[7]})`
-  };
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function parseProgress(progressData) {
+  if (typeof progressData === 'object' && progressData.eval_count !== undefined) {
+    return {
+      currentEval: progressData.eval_count,
+      totalEval: progressData.total_tasks,
+      model: progressData.model,
+      subject: progressData.subject,
+      exam: progressData.exam,
+      repetition: String(progressData.rep),
+      totalReps: String(progressData.repetitions),
+      evalMsg: `Eval ${progressData.eval_count}/${progressData.total_tasks}`,
+      detailMsg: `Evaluating <b>${escapeHtml(progressData.model)}</b> on <b>${escapeHtml(progressData.subject)}</b> with <b>${escapeHtml(progressData.exam)}</b> (Repetition ${escapeHtml(String(progressData.rep))}/${escapeHtml(String(progressData.repetitions))})`
+    };
+  }
+  return null;
 }
 
 /**
@@ -123,16 +131,16 @@ function processBatchEvalChunk(chunk) {
       $("#batch-eval-table tbody").append(
         `<tr class="batch-eval-error-row">
           <td data-label="Date">${headingLink} ${datetimeStr}</td>
-          <td data-label="Model">${lastRow.model||''}</td>
-          <td data-label="Subject">${lastRow.subject||''}</td>
-          <td data-label="Exam">${lastRow.exam||''}</td>
-          <td data-label="Repetition">${lastRow.repetition||''}</td>
+          <td data-label="Model">${escapeHtml(lastRow.model || '')}</td>
+          <td data-label="Subject">${escapeHtml(lastRow.subject || '')}</td>
+          <td data-label="Exam">${escapeHtml(lastRow.exam || '')}</td>
+          <td data-label="Repetition">${escapeHtml(lastRow.repetition || '')}</td>
           <td data-label="Grade">Error</td>
           <td data-label="Time">-</td>
         </tr>`
       );
 
-      const errorMsg = `Evaluating <b>${lastRow.model}</b> on <b>${lastRow.subject}</b> with <b>${lastRow.exam}</b> (Repetition ${lastRow.repetition}/${lastRow.totalReps}): ${data.error}`;
+      const errorMsg = `Evaluating <b>${escapeHtml(lastRow.model)}</b> on <b>${escapeHtml(lastRow.subject)}</b> with <b>${escapeHtml(lastRow.exam)}</b> (Repetition ${escapeHtml(lastRow.repetition)}/${escapeHtml(lastRow.totalReps)}): ${escapeHtml(data.error)}`;
       $("#batch-eval-errors").append(`<div class="batch-eval-error">${errorMsg}</div>`);
 
 
@@ -146,13 +154,12 @@ function processBatchEvalChunk(chunk) {
           repetition: progress.repetition,
           totalReps: progress.totalReps,
         };
-        // Store current subject and exam for heading
         window._currentExamDetailKey = `${progress.subject}|||${progress.exam}`;
         window._examDetailHeadingShown = false;
         updateProgressBar(progress);
         $("#batch-eval-results").html(`<div class="batch-eval-progress-detail">${progress.detailMsg}</div>`);
       } else {
-        $("#progress-bar").text(data.progress);
+        $("#progress-bar").text(typeof data.progress === 'string' ? data.progress : '');
       }
     } else if (data.processed_questions && data.response) {
       // Show per-question result as it arrives
@@ -172,10 +179,10 @@ function processBatchEvalChunk(chunk) {
 
           const headingHtml = `
             <div id="${evalId}" class="exam-detail-heading exam-detail-heading-margin eval-details-section">
-              <span class="exam-detail-label">Model:</span> <span class="exam-detail-value">${model} - </span>
-              <span class="exam-detail-label">Subject:</span> <span class="exam-detail-value">${subject} - </span>
-              <span class="exam-detail-label">Exam:</span> <span class="exam-detail-value">${exam} - </span>
-              <span class="exam-detail-label">Repetition:</span> <span class="exam-detail-value">${repetition}/${totalReps}</span>
+              <span class="exam-detail-label">Model:</span> <span class="exam-detail-value">${escapeHtml(model)} - </span>
+              <span class="exam-detail-label">Subject:</span> <span class="exam-detail-value">${escapeHtml(subject)} - </span>
+              <span class="exam-detail-label">Exam:</span> <span class="exam-detail-value">${escapeHtml(exam)} - </span>
+              <span class="exam-detail-label">Repetition:</span> <span class="exam-detail-value">${escapeHtml(repetition)}/${escapeHtml(totalReps)}</span>
             </div>
           `;
           $("#exam-details").append(headingHtml);
@@ -186,9 +193,9 @@ function processBatchEvalChunk(chunk) {
       const detailsHtml = `
         <div class="exam-detail-box">
           <b>Question ${data.processed_questions}:</b>
-          <pre>${response.question_prompt}</pre>
-          <b>Model response:</b> <span class="model-response-text ${response.is_correct ? 'correct-response' : 'incorrect-response'}">${response.response}</span><br>
-          <b>Correct option:</b> ${response.correct_option}
+          <pre>${escapeHtml(response.question_prompt)}</pre>
+          <b>Model response:</b> <span class="model-response-text ${response.is_correct ? 'correct-response' : 'incorrect-response'}">${escapeHtml(response.response)}</span><br>
+          <b>Correct option:</b> ${escapeHtml(response.correct_option)}
           <span class="correctness-icon">${response.is_correct ? "✅" : "❌"}</span>
           <div class="question-time">Time: ${data.time || "-"}s</div>
         </div>
@@ -227,7 +234,7 @@ function processBatchEvalChunk(chunk) {
         $("#batch-eval-results").append($summary);
       }
       $summary.html(
-        `Result: <b>${grade}</b> correct, Time: <b>${time}s</b>`
+        `Result: <b>${escapeHtml(grade)}</b> correct, Time: <b>${escapeHtml(time)}s</b>`
       );
 
       // Move the summary above the details, but below the progress message
@@ -245,12 +252,12 @@ function processBatchEvalChunk(chunk) {
       $("#batch-eval-table tbody").append(
         `<tr>
           <td data-label="Date">${headingLink} ${datetimeStr}</td>
-          <td data-label="Model">${lastRow.model||''}</td>
-          <td data-label="Subject">${lastRow.subject||''}</td>
-          <td data-label="Exam">${lastRow.exam||''}</td>
-          <td data-label="Repetition">${lastRow.repetition||''}</td>
-          <td data-label="Grade">${grade}</td>
-          <td data-label="Time">${time}</td>
+          <td data-label="Model">${escapeHtml(lastRow.model || '')}</td>
+          <td data-label="Subject">${escapeHtml(lastRow.subject || '')}</td>
+          <td data-label="Exam">${escapeHtml(lastRow.exam || '')}</td>
+          <td data-label="Repetition">${escapeHtml(lastRow.repetition || '')}</td>
+          <td data-label="Grade">${escapeHtml(grade)}</td>
+          <td data-label="Time">${escapeHtml(time)}</td>
         </tr>`
       );
       if (!document.getElementById(evalId)) {
@@ -270,7 +277,7 @@ function processBatchEvalChunk(chunk) {
       $("#loading-indicator").hide();
     }
   } catch (e) {
-    $("#batch-eval-errors").append(`<div class="batch-eval-error">Error parsing chunk: ${e.message}</div>`);
+    $("#batch-eval-errors").append(`<div class="batch-eval-error">Error parsing chunk: ${escapeHtml(e.message)}</div>`);
     console.error("Error parsing chunk:", e);
   }
 }

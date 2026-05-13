@@ -1,6 +1,5 @@
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render
-from django.views.decorators.csrf import csrf_exempt
 
 from genaigrader.models import Course
 from genaigrader.services.get_models_service import get_models_for_user
@@ -23,7 +22,7 @@ def evaluate_view(request):
     )
 
 
-@csrf_exempt
+@login_required
 def upload_file(request):
     """Handle exam upload and processing with full validation"""
     return handle_file_upload(request)

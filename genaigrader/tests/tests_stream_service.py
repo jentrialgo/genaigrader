@@ -26,12 +26,17 @@ class StreamServiceTest(TestCase):
             course=self.course, description="Test Exam", user=self.user
         )
 
+    @patch("genaigrader.services.stream_service.get_evaluation_ollama_version")
     @patch("genaigrader.services.stream_service.QuestionEvaluation")
-    def test_stream_responses_handles_api_error(self, mock_question_evaluation):
+    def test_stream_responses_handles_api_error(
+        self, mock_question_evaluation, mock_ollama_version
+    ):
         """
         Test that when an external model API call fails, stream_responses
         yields a data object containing an error message for batch_evaluations.js
         """
+        mock_ollama_version.return_value = "test-version"
+
         # Setup mock QuestionEvaluation to avoid Django validation errors
         mock_question_evaluation_instance = Mock()
         mock_question_evaluation.objects.create.return_value = (
