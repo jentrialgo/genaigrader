@@ -3,6 +3,15 @@ function updateProgressBar(progress) {
   $("#progress-bar").css("width", percentage + "%").text(percentage.toFixed(0) + "%");
 }
 
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 function appendResponseDetails(progress) {
   const response = progress.response;
   const responseColor = response.is_correct ? "var(--success-color)" : "var(--error-color)";
@@ -10,11 +19,11 @@ function appendResponseDetails(progress) {
     <div style="border: 1px solid var(--border-color); padding: 10px; margin: 10px 0; border-radius: 5px; background: var(--background-medium);">
       <p><strong>Response time:</strong> ${progress.time}s</p>
       <p><strong>Prompt:</strong></p>
-      <pre>${response.user_prompt}</pre>
+      <pre>${escapeHtml(response.user_prompt)}</pre>
       <p><strong>Question ${progress.processed_questions}:</strong></p>
-      <pre>${response.question_prompt}</pre>
-      <p><strong>Model response:</strong> <span style="color: ${responseColor}; font-weight: bold;">${response.response}</span></p>
-      <p><strong>Correct option:</strong> ${response.correct_option}</p>
+      <pre>${escapeHtml(response.question_prompt)}</pre>
+      <p><strong>Model response:</strong> <span style="color: ${responseColor}; font-weight: bold;">${escapeHtml(response.response)}</span></p>
+      <p><strong>Correct option:</strong> ${escapeHtml(response.correct_option)}</p>
     </div>
   `;
   $("#exam-details").append(detailsHtml);

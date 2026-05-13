@@ -1,7 +1,44 @@
+import ipaddress
+import socket
+from urllib.parse import urlparse
+
 import ollama
 import openai
 from django.core.exceptions import ValidationError
 from django.core.validators import URLValidator
+
+
+def is_private_url(url):
+    """Return True if url resolves to a private, loopback, or reserved IP.
+
+    NOTE: This check is subject to DNS rebinding (TOCTOU). The hostname is
+    resolved here, but the subsequent HTTP client resolves independently.
+    For full protection, pin the resolved IP in the HTTP adapter. This
+    provides defense-in-depth, not a complete SSRF defense.
+    """
+    try:
+        parsed = urlparse(url)
+        hostname = parsed.hostname
+        if not hostname:
+            return True
+        try:
+            addresses = socket.getaddrinfo(hostname, None)
+        except socket.gaierror:
+            return True
+        for family, _, _, _, sockaddr in addresses:
+            ip = ipaddress.ip_address(sockaddr[0])
+            if (
+                ip.is_private
+                or ip.is_loopback
+                or ip.is_link_local
+                or ip.is_reserved
+                or ip.is_multicast
+                or ip.is_unspecified
+            ):
+                return True
+        return False
+    except (ValueError, TypeError):
+        return True
 
 
 class LlmApi:
@@ -43,6 +80,13 @@ class LlmApi:
             if not self.model_obj.api_key:
                 errors.append("API key is required for external models")
 
+            # Block SSRF: reject URLs that resolve to private/reserved IPs.
+            if not errors and self.model_obj.api_url:
+                if is_private_url(self.model_obj.api_url):
+                    errors.append(
+                        "API URL resolves to a private or reserved IP address"
+                    )
+
             # Validate connectivity and authentication for external models.
             if not errors:
                 try:
@@ -83,6 +127,12 @@ class LlmApi:
         buffer = ""
         first_chunk = True
         buffering = False
+
+        def yield_non_blank_lines(text):
+            for line in text.splitlines():
+                if line.strip():
+                    yield line
+
         for chunk in stream:
             content = get_content(chunk)
             if not content:
@@ -92,12 +142,16 @@ class LlmApi:
                 if content.lstrip().startswith("<think>"):
                     buffering = True
                     buffer += content
-                    continue  # Don't yield yet
+                    end_tag = buffer.find("</think>")
+                    if end_tag != -1:
+                        after = buffer[end_tag + len("</think>") :]
+                        yield from yield_non_blank_lines(after)
+                        buffering = False
+                        buffer = ""
+                    continue  # Don't yield while buffering
                 else:
                     # Only yield non-blank lines
-                    for line in content.splitlines():
-                        if line.strip():
-                            yield line
+                    yield from yield_non_blank_lines(content)
                     continue
             if buffering:
                 buffer += content
@@ -107,16 +161,19 @@ class LlmApi:
                     continue
                 # Found </think>, yield only what comes after
                 after = buffer[end_tag + len("</think>") :]
-                for line in after.splitlines():
-                    if line.strip():
-                        yield line
+                yield from yield_non_blank_lines(after)
                 buffering = False
                 buffer = ""
             else:
                 # Only yield non-blank lines
-                for line in content.splitlines():
-                    if line.strip():
-                        yield line
+                yield from yield_non_blank_lines(content)
+
+        # Flush any remaining buffered content if closing tag was received at the end.
+        if buffering and buffer:
+            end_tag = buffer.find("</think>")
+            if end_tag != -1:
+                after = buffer[end_tag + len("</think>") :]
+                yield from yield_non_blank_lines(after)
 
     def _use_external_model(self, prompt):
         """

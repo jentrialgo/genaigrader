@@ -1,4 +1,5 @@
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import ValidationError
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.views.decorators.http import require_http_methods
@@ -46,28 +47,33 @@ def exam_detail(request, exam_id):
 @login_required
 @require_http_methods(["DELETE"])
 def delete_evaluation(request, eval_id):
-    try:
-        evaluation = get_object_or_404(
-            Evaluation.objects.select_related("exam__course"),
-            id=eval_id,
-            exam__course__user=request.user,
+    evaluation = (
+        Evaluation.objects.select_related("exam__course")
+        .filter(id=eval_id, exam__course__user=request.user)
+        .first()
+    )
+    if evaluation is None:
+        return JsonResponse(
+            {"status": "error", "message": "Evaluation not found"}, status=404
         )
-        evaluation.delete()
-        return JsonResponse({"status": "success"})
-    except Exception as e:
-        return JsonResponse({"status": "error", "message": str(e)}, status=400)
+    evaluation.delete()
+    return JsonResponse({"status": "success"})
 
 
 @login_required
 @require_http_methods(["GET"])
 def question_analytics(request, question_id):
     try:
-        question = Question.objects.get(id=question_id)
+        question = (
+            Question.objects.select_related("exam__course")
+            .filter(id=question_id, exam__course__user=request.user)
+            .first()
+        )
+        if question is None:
+            return JsonResponse(
+                {"success": False, "error": "Question not found"}, status=404
+            )
         stats = calculate_question_analytics(question)
         return JsonResponse({"success": True, "data": stats})
-    except Question.DoesNotExist:
-        return JsonResponse(
-            {"success": False, "error": "Question not found"}, status=404
-        )
-    except Exception as e:
-        return JsonResponse({"success": False, "error": str(e)}, status=500)
+    except (ValueError, TypeError, ValidationError) as e:
+        return JsonResponse({"success": False, "error": str(e)}, status=400)
