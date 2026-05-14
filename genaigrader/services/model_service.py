@@ -1,10 +1,56 @@
 import colorsys
 import hashlib
+import json
+import logging
 import math
 import random
 import re
 
+import requests
+from django.conf import settings
+
 DEFAULT_MODEL_COLOR = "#64748B"
+
+logger = logging.getLogger(__name__)
+
+
+def pull_model(model_name):
+    try:
+        response = requests.post(
+            f"{settings.OLLAMA_API_URL}/api/pull",
+            json={"name": model_name},
+            stream=True,
+            timeout=(5, None),
+        )
+    except requests.exceptions.ConnectionError as exc:
+        raise RuntimeError(
+            "Could not connect to Ollama. Is it running? https://ollama.com/download"
+        ) from exc
+    except requests.exceptions.Timeout as exc:
+        raise RuntimeError("Ollama connection timed out") from exc
+
+    if response.status_code != 200:
+        raise RuntimeError(f"Ollama returned {response.status_code}: {response.text}")
+
+    download_complete = False
+    for line in response.iter_lines():
+        if line:
+            try:
+                chunk = json.loads(line)
+                if "error" in chunk:
+                    raise RuntimeError(f"Ollama error: {chunk['error']}")
+                if chunk.get("status") == "success":
+                    download_complete = True
+            except json.JSONDecodeError:
+                raise RuntimeError("Error reading Ollama response")
+
+    if not download_complete:
+        raise RuntimeError("Model download did not complete successfully")
+
+    from genaigrader.models import Model
+
+    model, _ = Model.objects.get_or_create(description=model_name)
+    return {"model_id": model.id, "model": model_name, "status": "downloaded"}
 
 
 def get_or_create_model(request):

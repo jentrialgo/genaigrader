@@ -35,7 +35,7 @@ def exam_detail(request, exam_id):
         {
             "exam": exam,
             "course": exam.course,
-            "questions": exam.question_set.all(),
+            "questions": exam.question_set.all().order_by("id"),
             "evaluations": evaluations,
             "model_averages": model_averages,
             "time_averages": time_averages,
@@ -47,32 +47,27 @@ def exam_detail(request, exam_id):
 @login_required
 @require_http_methods(["DELETE"])
 def delete_evaluation(request, eval_id):
-    evaluation = (
-        Evaluation.objects.select_related("exam__course")
-        .filter(id=eval_id, exam__course__user=request.user)
-        .first()
-    )
-    if evaluation is None:
-        return JsonResponse(
-            {"status": "error", "message": "Evaluation not found"}, status=404
+    try:
+        evaluation = get_object_or_404(
+            Evaluation.objects.select_related("exam__course"),
+            id=eval_id,
+            exam__course__user=request.user,
         )
-    evaluation.delete()
-    return JsonResponse({"status": "success"})
+        evaluation.delete()
+        return JsonResponse({"status": "success"})
+    except (ValueError, TypeError, ValidationError) as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)
 
 
 @login_required
 @require_http_methods(["GET"])
 def question_analytics(request, question_id):
     try:
-        question = (
-            Question.objects.select_related("exam__course")
-            .filter(id=question_id, exam__course__user=request.user)
-            .first()
+        question = get_object_or_404(
+            Question.objects.select_related("exam__course"),
+            id=question_id,
+            exam__course__user=request.user,
         )
-        if question is None:
-            return JsonResponse(
-                {"success": False, "error": "Question not found"}, status=404
-            )
         stats = calculate_question_analytics(question)
         return JsonResponse({"success": True, "data": stats})
     except (ValueError, TypeError, ValidationError) as e:

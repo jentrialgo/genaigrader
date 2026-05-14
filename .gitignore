@@ -97,9 +97,12 @@ celerybeat-schedule.*
 # SageMath parsed files 
 *.sage.py 
 
-# Environments 
-.env 
-.venv 
+# Volcado de datos de la migración SQLite -> PostgreSQL (contiene credenciales)
+datadump.json
+
+# Environments
+.env
+.venv
 env/ 
 venv/ 
 ENV/ 
@@ -151,3 +154,7 @@ ollama.pid
 .env.django
 .env.django.base
 .idea
+
+# AI agent context files (local only, not versioned)
+AGENTS.md
+.opencode/

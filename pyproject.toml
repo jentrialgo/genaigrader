@@ -8,6 +8,7 @@ dependencies = [
     "dj-database-url>=2.2.0",
     "django>=5.2.1",
     "django-allauth[socialaccount]",
+    "django-q2>=1.0.0",
     "gunicorn>=23.0.0",
     "ollama>=0.4.8",
     "openai>=1.78.1",

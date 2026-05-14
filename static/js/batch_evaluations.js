@@ -1,47 +1,5 @@
-/**
- * Parses a progress string from the batch evaluation stream.
- * @param {string} progressStr - The progress string to parse.
- * @returns {object|null} An object with parsed progress fields, or null if parsing fails.
- */
-function escapeHtml(value) {
-  return String(value ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/\"/g, '&quot;')
-    .replace(/'/g, '&#039;');
-}
-
-function parseProgress(progressData) {
-  if (typeof progressData === 'object' && progressData.eval_count !== undefined) {
-    return {
-      currentEval: progressData.eval_count,
-      totalEval: progressData.total_tasks,
-      model: progressData.model,
-      subject: progressData.subject,
-      exam: progressData.exam,
-      repetition: String(progressData.rep),
-      totalReps: String(progressData.repetitions),
-      evalMsg: `Eval ${progressData.eval_count}/${progressData.total_tasks}`,
-      detailMsg: `Evaluating <b>${escapeHtml(progressData.model)}</b> on <b>${escapeHtml(progressData.subject)}</b> with <b>${escapeHtml(progressData.exam)}</b> (Repetition ${escapeHtml(String(progressData.rep))}/${escapeHtml(String(progressData.repetitions))})`
-    };
-  }
-  return null;
-}
-
-/**
- * Updates the progress bar UI with the current evaluation progress.
- * @param {object} progress - The progress object returned by parseProgress.
- */
-function updateProgressBar(progress) {
-  $("#progress-bar")
-    .removeAttr('style')
-    .addClass('progress-bar-custom')
-    .text(progress.evalMsg);
-  if (!isNaN(progress.currentEval) && !isNaN(progress.totalEval) && progress.totalEval > 0) {
-    const percent = Math.round((progress.currentEval / progress.totalEval) * 100);
-    $("#progress-bar").css("width", percent + "%");
-  }
+function escapeHtml(text) {
+  return $("<div>").text(text || "").html();
 }
 
 /**
@@ -64,222 +22,274 @@ function collectBatchEvalFormData(formElem) {
 }
 
 /**
- * Handles the streaming response from the batch evaluation POST request.
- * Reads and processes each chunk of streamed data.
- * @param {Response} response - The fetch response object.
- * @returns {Promise<void>} Resolves when the stream is fully processed.
+ * Renders a single evaluation row into the batch results table.
+ * @param {object} ev - Evaluation status object from the API.
  */
-function handleBatchEvalStream(response) {
-  if (!response.ok) {
-    $("#loading-indicator").hide();
-    $("#batch-eval-results").html("Error starting batch evaluation.");
-    throw new Error("Network response was not ok");
+function renderEvaluationRow(ev, meta) {
+  var now = new Date();
+  var datetimeStr = now.toLocaleString();
+  var headingLink = '<a href="/exam/' + ev.exam_id + '/" class="details-link" title="View details"><span class="details-icon" aria-label="Details">🔍</span></a>';
+  var gradeCell;
+  if (ev.status === "failed") {
+    gradeCell = 'Failed';
+  } else if (ev.status === "completed") {
+    gradeCell = ev.grade !== null ? ev.grade : "-";
+  } else {
+    gradeCell = "Pending";
   }
 
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder("utf-8");
-  let buffer = '';
-  window._batchEvalFinished = false; // To detect if the stream finished normally
-
-  function processStream({ done, value }) {
-    if (done) {
-      $("#loading-indicator").hide();
-
-      // If the "done" message was not received, we assume the stream was interrupted
-      if (!window._batchEvalFinished) {
-        const now = new Date();
-        const datetimeStr = now.toLocaleString();
-        $("#batch-eval-errors").append(
-          `<div class="batch-eval-error">
-            <span class="batch-eval-error-date">${datetimeStr}</span>
-            Evaluation stream was interrupted or did not finish properly.
-            Please check the server logs for more details.
-          </div>`
-        );
-      }
-
-      return;
-    }
-
-    buffer += decoder.decode(value, { stream: true });
-    const chunks = buffer.split("\n\n");
-    buffer = chunks.pop() || '';
-    chunks.forEach(chunk => processBatchEvalChunk(chunk));
-    return reader.read().then(processStream);
+  var repetitionCell = "-";
+  if (meta && meta.repetition && meta.totalReps) {
+    repetitionCell = escapeHtml(meta.repetition) + "/" + escapeHtml(meta.totalReps);
   }
-  return reader.read().then(processStream);
+
+  $("#batch-eval-table").show();
+  var $row = $("<tr></tr>");
+  $row.append($('<td data-label="Date"></td>').append(headingLink, ' ' + escapeHtml(datetimeStr)));
+  $row.append($('<td data-label="Model"></td>').text(ev.model_name || ev.model_id || "-"));
+  $row.append($('<td data-label="Subject"></td>').text(ev.course_name || "-"));
+  $row.append($('<td data-label="Exam"></td>').text(ev.exam_name || ev.exam_id || "-"));
+  $row.append($('<td data-label="Repetition"></td>').text(repetitionCell));
+  $row.append($('<td data-label="Grade"></td>').text(gradeCell));
+  $row.append($('<td data-label="Time"></td>').text(ev.time !== null ? ev.time.toFixed(2) : "-"));
+  $("#batch-eval-table tbody").append($row);
 }
 
 /**
- * Processes a single chunk of streamed data from the batch evaluation.
- * Updates the UI based on the type of message received.
- * @param {string} chunk - The chunk of data to process.
+ * Polls an individual evaluation's question details and renders them.
+ * @param {number} evalId - Evaluation ID to poll.
+ * @param {object} meta - Metadata for this evaluation (model, exam, repetition).
  */
-function processBatchEvalChunk(chunk) {
-  if (chunk.trim() === "") return;
-  try {
-    const data = JSON.parse(chunk.replace("data: ", ""));
-    if (data.error) {
-      // Add a row to the table indicating that there was an error
-      const lastRow = window._batchEvalLastRow || {};
-      const now = new Date();
-      const datetimeStr = now.toLocaleString();
-      const evalId = window._lastEvalId || '';
-      const headingLink = `<a href="#${evalId}" class="details-link" title="View details"><span class="details-icon" aria-label="Details">🔍</span></a>`;
-
-      $("#batch-eval-table").show();
-      $("#batch-eval-table tbody").append(
-        `<tr class="batch-eval-error-row">
-          <td data-label="Date">${headingLink} ${datetimeStr}</td>
-          <td data-label="Model">${escapeHtml(lastRow.model || '')}</td>
-          <td data-label="Subject">${escapeHtml(lastRow.subject || '')}</td>
-          <td data-label="Exam">${escapeHtml(lastRow.exam || '')}</td>
-          <td data-label="Repetition">${escapeHtml(lastRow.repetition || '')}</td>
-          <td data-label="Grade">Error</td>
-          <td data-label="Time">-</td>
-        </tr>`
-      );
-
-      const errorMsg = `Evaluating <b>${escapeHtml(lastRow.model)}</b> on <b>${escapeHtml(lastRow.subject)}</b> with <b>${escapeHtml(lastRow.exam)}</b> (Repetition ${escapeHtml(lastRow.repetition)}/${escapeHtml(lastRow.totalReps)}): ${escapeHtml(data.error)}`;
-      $("#batch-eval-errors").append(`<div class="batch-eval-error">${errorMsg}</div>`);
-
-
-    } else if (data.progress) {
-      const progress = parseProgress(data.progress);
-      if (progress) {
-        window._batchEvalLastRow = {
-          model: progress.model,
-          subject: progress.subject,
-          exam: progress.exam,
-          repetition: progress.repetition,
-          totalReps: progress.totalReps,
-        };
-        window._currentExamDetailKey = `${progress.subject}|||${progress.exam}`;
-        window._examDetailHeadingShown = false;
-        updateProgressBar(progress);
-        $("#batch-eval-results").html(`<div class="batch-eval-progress-detail">${progress.detailMsg}</div>`);
-      } else {
-        $("#progress-bar").text(typeof data.progress === 'string' ? data.progress : '');
-      }
-    } else if (data.processed_questions && data.response) {
-      // Show per-question result as it arrives
-      // Insert heading if not already shown for this exam
-      if (!window._examDetailHeadingShown) {
-        const key = window._currentExamDetailKey || '';
-        if (key) {
-          const [subject, exam] = key.split('|||');
-          const lastRow = window._batchEvalLastRow || {};
-          const model = lastRow.model || '-';
-          const repetition = lastRow.repetition || '-';
-          const totalReps = lastRow.totalReps || '-';
-
-          // Create a unique evalId for this evaluation
-          const evalId = `eval-${btoa(`${model}|${subject}|${exam}|${repetition}|${Date.now()}`).replace(/[^a-zA-Z0-9]/g, '')}`;
-          window._lastEvalId = evalId; // Store for use in table row
-
-          const headingHtml = `
-            <div id="${evalId}" class="exam-detail-heading exam-detail-heading-margin eval-details-section">
-              <span class="exam-detail-label">Model:</span> <span class="exam-detail-value">${escapeHtml(model)} - </span>
-              <span class="exam-detail-label">Subject:</span> <span class="exam-detail-value">${escapeHtml(subject)} - </span>
-              <span class="exam-detail-label">Exam:</span> <span class="exam-detail-value">${escapeHtml(exam)} - </span>
-              <span class="exam-detail-label">Repetition:</span> <span class="exam-detail-value">${escapeHtml(repetition)}/${escapeHtml(totalReps)}</span>
-            </div>
-          `;
-          $("#exam-details").append(headingHtml);
+function pollEvaluationQuestions(evalId, meta) {
+  var MAX_RETRIES = 10;
+  var state = {
+    headingShown: false,
+    renderedQuestions: {},
+    totalQuestions: null,
+    retries: 0,
+  };
+  var interval = setInterval(function() {
+    fetch("/evaluation/" + evalId + "/questions/")
+      .then(function(r) {
+        var ct = r.headers.get("content-type") || "";
+        if (!r.ok || r.redirected || ct.indexOf("application/json") === -1) {
+          clearInterval(interval);
+          return null;
         }
-        window._examDetailHeadingShown = true;
-      }
-      const response = data.response;
-      const detailsHtml = `
-        <div class="exam-detail-box">
-          <b>Question ${data.processed_questions}:</b>
-          <pre>${escapeHtml(response.question_prompt)}</pre>
-          <b>Model response:</b> <span class="model-response-text ${response.is_correct ? 'correct-response' : 'incorrect-response'}">${escapeHtml(response.response)}</span><br>
-          <b>Correct option:</b> ${escapeHtml(response.correct_option)}
-          <span class="correctness-icon">${response.is_correct ? "✅" : "❌"}</span>
-          <div class="question-time">Time: ${data.time || "-"}s</div>
-        </div>
-      `;
-      $("#exam-details").append(detailsHtml);
+        return r.json();
+      })
+      .then(function(data) {
+        if (!data || !data.questions) return;
+        state.retries = 0;
+        if (state.totalQuestions === null) {
+          state.totalQuestions = data.total_questions;
+        }
 
-      // Add Back to Top link after the last question
-      if (
-        (typeof response.total_questions !== 'undefined' && data.processed_questions == response.total_questions) ||
-        (typeof data.total_questions !== 'undefined' && data.processed_questions == data.total_questions)
-      ) {
-        $("#exam-details").append('<div class="back-to-top-link-container"><a href="#top" class="back-to-top-link no-underline">⬆ Back to Top</a></div>');
-      }
+        if (!state.headingShown && data.questions.length > 0) {
+          var evalIdSafe = "eval-" + evalId;
+          var headingHtml = '<div id="' + evalIdSafe + '" class="exam-detail-heading exam-detail-heading-margin eval-details-section">' +
+            '<span class="exam-detail-label">Model:</span> <span class="exam-detail-value">' + escapeHtml(data.model_name || "-") + ' - </span>' +
+            '<span class="exam-detail-label">Subject:</span> <span class="exam-detail-value">' + escapeHtml(data.course_name || "-") + ' - </span>' +
+            '<span class="exam-detail-label">Exam:</span> <span class="exam-detail-value">' + escapeHtml(data.exam_name || "-") + ' - </span>' +
+            '<span class="exam-detail-label">Repetition:</span> <span class="exam-detail-value">' + escapeHtml(meta.repetition || "-") + "/" + escapeHtml(meta.totalReps || "-") + '</span>' +
+          '</div>';
+          $("#exam-details").append(headingHtml);
+          state.headingShown = true;
+        }
 
-    } else if (data.response) {
-      // Use appendResponseDetails from utils.js for consistent UI
-      const progressLike = {
-        response: data.response,
-        time: data.response.time || '-',
-        processed_questions: data.response.processed_questions || '-',
-        total_questions: data.response.total_questions || '-',
-      };
-      appendResponseDetails(progressLike);
-    } else if (data.processed_questions && data.total_questions) {
-      const percent = Math.round((data.processed_questions / data.total_questions) * 100);
-      $("#progress-bar").css("width", percent + "%");
-    } else if (data.eval_result) {
-      // Show the result of the last eval (grade and time)
-      const grade = data.eval_result.grade;
-      const time = data.eval_result.time;
+        for (var i = 0; i < data.questions.length; i++) {
+          var q = data.questions[i];
+          if (state.renderedQuestions[q.question_id]) continue;
+          state.renderedQuestions[q.question_id] = true;
 
-      // Find or create a summary area
-      let $summary = $("#batch-eval-summary");
-      if ($summary.length === 0) {
-        $summary = $("<div id='batch-eval-summary' class='batch-eval-summary'></div>");
-        $("#batch-eval-results").append($summary);
-      }
-      $summary.html(
-        `Result: <b>${escapeHtml(grade)}</b> correct, Time: <b>${escapeHtml(time)}s</b>`
+          var detailsHtml = '<div class="exam-detail-box">' +
+            '<b>Question ' + q.question_number + ':</b>' +
+            '<pre>' + escapeHtml(q.question_prompt) + '</pre>' +
+            '<b>Model response:</b> <span class="model-response-text ' + (q.is_correct ? 'correct-response' : 'incorrect-response') + '">' + escapeHtml(q.response) + '</span><br>' +
+            '<b>Correct option:</b> ' + escapeHtml(q.correct_option) +
+            '<span class="correctness-icon">' + (q.is_correct ? "✅" : "❌") + '</span>' +
+            '<div class="question-time">Time: ' + (q.question_time !== null ? q.question_time : "-") + 's</div>' +
+          '</div>';
+          $("#exam-details").append(detailsHtml);
+        }
+
+        if (data.status === "failed") {
+          clearInterval(interval);
+          $("#exam-details").append(
+            '<div class="exam-error-message">Evaluation failed for ' + escapeHtml(data.model_name || "Model") + '.</div>' +
+            '<div class="back-to-top-link-container"><a href="#top" class="back-to-top-link no-underline">⬆ Back to Top</a></div>'
+          );
+          return;
+        }
+
+        if (data.status === "completed" || (data.questions.length >= state.totalQuestions && state.totalQuestions > 0)) {
+          clearInterval(interval);
+          $("#exam-details").append('<div class="back-to-top-link-container"><a href="#top" class="back-to-top-link no-underline">⬆ Back to Top</a></div>');
+        }
+      })
+      .catch(function() {
+        state.retries++;
+        if (state.retries >= MAX_RETRIES) {
+          clearInterval(interval);
+        }
+      });
+  }, 2000);
+  return interval;
+}
+
+/**
+ * Polls the batch-evaluation-status endpoint and renders rows for completed evaluations.
+ * Progress is based on real QuestionEvaluation rows (completed_tasks/total_tasks),
+ * not on django-q2 task records, so it cannot be affected by task pruning.
+ * @param {number[]} evaluationIds - Array of evaluation IDs to monitor.
+ * @param {Object} metaById - Map of evaluation ID to { repetition, totalReps }.
+ * @param {Function} onProgress - Callback with (finishedQuestions, totalQuestions).
+ * @param {Function} onAllComplete - Callback when all evaluations are done.
+ */
+function pollEvaluations(evaluationIds, metaById, onProgress, onAllComplete) {
+  var MAX_RETRIES = 10;
+  var csrf = getCookie("csrftoken");
+  var rendered = {};
+  var retries = 0;
+  var interval = setInterval(function() {
+    fetch("/batch-evaluation-status/", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRFToken": csrf
+      },
+      body: JSON.stringify({ ids: evaluationIds })
+    })
+      .then(function(r) {
+        var ct = r.headers.get("content-type") || "";
+        if (!r.ok || r.redirected || ct.indexOf("application/json") === -1) {
+          clearInterval(interval);
+          return null;
+        }
+        return r.json();
+      })
+      .then(function(data) {
+        if (!data || !data.results) return;
+        if (data.status === "error") {
+          clearInterval(interval);
+          return;
+        }
+        retries = 0;
+        var allDone = true;
+        var finishedQuestions = 0;
+        var totalQuestions = 0;
+        for (var i = 0; i < data.results.length; i++) {
+          var ev = data.results[i];
+          if (typeof ev.completed_tasks === "number") {
+            finishedQuestions += ev.completed_tasks;
+          }
+          if (typeof ev.total_tasks === "number") {
+            totalQuestions += ev.total_tasks;
+          }
+          if (ev.status === "completed" || ev.status === "failed") {
+            if (!rendered[ev.evaluation_id]) {
+              rendered[ev.evaluation_id] = true;
+              renderEvaluationRow(ev, metaById["" + ev.evaluation_id]);
+              if (ev.status === "failed" && ev.failed_reason) {
+                $("#batch-eval-errors").append(
+                  '<div class="batch-eval-error">Evaluation ' + ev.evaluation_id +
+                  ' failed on question ' + (ev.failed_question_id || "?") +
+                  ': ' + escapeHtml(ev.failed_reason) + '</div>'
+                );
+              }
+            }
+          } else {
+            allDone = false;
+          }
+        }
+        if (onProgress) {
+          onProgress(finishedQuestions, totalQuestions);
+        }
+        if (allDone) {
+          clearInterval(interval);
+          if (onAllComplete) onAllComplete();
+        }
+      })
+      .catch(function() {
+        retries++;
+        if (retries >= MAX_RETRIES) {
+          clearInterval(interval);
+        }
+      });
+  }, 3000);
+  return interval;
+}
+
+/**
+ * Handles the batch evaluation task response and polls for results.
+ * @param {Response} response - The fetch response object.
+ * @returns {Promise<void>} Resolves when results are rendered.
+ */
+function handleBatchEvalTask(response) {
+  return response.json().then(function (data) {
+    if (data.status === "queued") {
+      window._batchEvalStartTime = Date.now();
+      $("#batch-eval-results").html(
+        '<div class="batch-eval-progress-detail">' + escapeHtml(data.message) + '</div>'
       );
+      $("#progress-bar")
+        .removeAttr("style")
+        .addClass("progress-bar-custom")
+        .text("Queued");
 
-      // Move the summary above the details, but below the progress message
-      $("#batch-eval-summary").insertAfter("#batch-eval-results > div:first-child");
-
-      // --- Add row to table ---
-      const lastRow = window._batchEvalLastRow || {};
-      const now = new Date();
-      const datetimeStr = now.toLocaleString();
-
-      // Use the lastEvalId created with the headingHtml for the link
-      const evalId = window._lastEvalId || '';
-      const headingLink = `<a href="#${evalId}" class="details-link" title="View details"><span class="details-icon" aria-label="Details">🔍</span></a>`;
-      $("#batch-eval-table").show();
-      $("#batch-eval-table tbody").append(
-        `<tr>
-          <td data-label="Date">${headingLink} ${datetimeStr}</td>
-          <td data-label="Model">${escapeHtml(lastRow.model || '')}</td>
-          <td data-label="Subject">${escapeHtml(lastRow.subject || '')}</td>
-          <td data-label="Exam">${escapeHtml(lastRow.exam || '')}</td>
-          <td data-label="Repetition">${escapeHtml(lastRow.repetition || '')}</td>
-          <td data-label="Grade">${escapeHtml(grade)}</td>
-          <td data-label="Time">${escapeHtml(time)}</td>
-        </tr>`
-      );
-      if (!document.getElementById(evalId)) {
-        // Now append the details section after the table row
-        $("#exam-details").append(`<div id="${evalId}" class="eval-details-section"></div>`);
+      // Poll evaluation IDs for the progress bar and table rows. Progress is
+      // based on real QuestionEvaluation rows (not django-q2 task records,
+      // whose retention is limited), so the bar cannot stall on large batches.
+      var metaById = {};
+      if (data.evaluations && data.evaluations.length) {
+        for (var j = 0; j < data.evaluations.length; j++) {
+          var evMeta = data.evaluations[j];
+          metaById["" + evMeta.id] = {
+            repetition: evMeta.repetition,
+            totalReps: evMeta.total_repetitions,
+          };
+        }
       }
-    } else if (data.done) {
-      // Do not clear or append, just mark finished
-      window._batchEvalFinished = true; // Mark as finished correctly
-      let finishedMsg = "Batch evaluation finished.";
-      if (window._batchEvalStartTime) {
-        const elapsedMs = Date.now() - window._batchEvalStartTime;
-        const elapsedStr = formatDuration(elapsedMs);
-        finishedMsg += ` <span class="batch-eval-time">(Total time: ${elapsedStr})</span>`;
+      if (data.evaluation_ids && data.evaluation_ids.length) {
+        pollEvaluations(data.evaluation_ids, metaById, function(finished, total) {
+          if (total > 0) {
+            var percent = Math.round((finished / total) * 100);
+            $("#progress-bar").css("width", percent + "%").text(finished + "/" + total);
+          }
+        }, function() {
+          // All evaluations reported as completed or failed
+          window._batchEvalFinished = true;
+          var elapsedMs = Date.now() - window._batchEvalStartTime;
+          var elapsedStr = formatDuration(elapsedMs);
+          $("#batch-eval-results").prepend(
+            '<div>Batch evaluation finished. <span class="batch-eval-time">(Total time: ' + elapsedStr + ')</span></div>'
+          );
+          $("#loading-indicator").hide();
+          $("#progress-bar").css("width", "100%").text("Done");
+        });
+      } else {
+        $("#loading-indicator").hide();
+        $("#progress-bar").css("width", "100%").text("Done");
       }
-      $("#batch-eval-results").html(`<div>${finishedMsg}</div>`);
+
+      // Poll per-question details for each evaluation
+      if (data.evaluations && data.evaluations.length) {
+        for (var j = 0; j < data.evaluations.length; j++) {
+          var evMeta = data.evaluations[j];
+          pollEvaluationQuestions(evMeta.id, {
+            repetition: evMeta.repetition,
+            totalReps: evMeta.total_repetitions,
+          });
+          if (window.addPendingEvaluation && evMeta.id && evMeta.exam_id) {
+            window.addPendingEvaluation(evMeta.id, evMeta.exam_id);
+          }
+        }
+      }
+    } else {
       $("#loading-indicator").hide();
+      $("#batch-eval-errors").html("Unexpected response from server.");
     }
-  } catch (e) {
-    $("#batch-eval-errors").append(`<div class="batch-eval-error">Error parsing chunk: ${escapeHtml(e.message)}</div>`);
-    console.error("Error parsing chunk:", e);
-  }
+  });
 }
 
 $(document).ready(function () {
@@ -299,14 +309,12 @@ $(document).ready(function () {
     $("#batch-eval-results").html("");
     $("#batch-eval-errors").html("");
     $("#exam-details").html("");
-    
-    // Record start time for batch evaluation
-    window._batchEvalStartTime = Date.now();
-    
+    $("#batch-eval-table tbody").html("");
+
     // Collect and prepare data
     const data = collectBatchEvalFormData(this);
-    
-    // Fetch and handle stream
+
+    // Fetch and handle response
     fetch(window.location.pathname, {
       method: "POST",
       headers: {
@@ -315,7 +323,7 @@ $(document).ready(function () {
       },
       body: JSON.stringify(data),
     })
-      .then(handleBatchEvalStream)
+      .then(handleBatchEvalTask)
       .catch((error) => {
         $("#loading-indicator").hide();
         $("#batch-eval-errors").html("Error: " + error.message);

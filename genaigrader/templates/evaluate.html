@@ -7,6 +7,7 @@
 {% block extra_css %}
   <link rel="stylesheet" href="{% static 'css/base.css' %}">
   <link rel="stylesheet" href="{% static 'css/evaluate.css' %}">
+  <link rel="stylesheet" href="{% static 'css/batch_evaluations.css' %}">
 {% endblock %}
 
 {% block content %}
@@ -49,6 +50,7 @@
 {% endblock %}
 
 {% block extra_scripts %}
-  <script src="{% static 'js/evaluate_utils.js' %}"></script>
-  <script src="{% static 'js/evaluate.js' %}"></script>
+  <script src="{% static 'js/polling.js' %}?v=2"></script>
+  <script src="{% static 'js/evaluate_utils.js' %}?v=2"></script>
+  <script src="{% static 'js/evaluate.js' %}?v=2"></script>
 {% endblock %}

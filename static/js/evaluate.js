@@ -58,6 +58,100 @@ $(document).ready(function () {
     `;
   }
 
+  function pollSingleExamQuestions(evalId, examId) {
+    var rendered = {};
+    var totalQuestions = null;
+    var retries = 0;
+    var MAX_RETRIES = 10;
+    var interval = setInterval(function() {
+      fetch("/evaluation/" + evalId + "/questions/")
+        .then(function(r) {
+          var ct = r.headers.get("content-type") || "";
+          if (!r.ok || r.redirected || ct.indexOf("application/json") === -1) {
+            clearInterval(interval);
+            return null;
+          }
+          return r.json();
+        })
+        .then(function(data) {
+          if (!data || !data.questions) return;
+          retries = 0;
+          if (totalQuestions === null) {
+            totalQuestions = data.total_questions;
+          }
+
+          for (var i = 0; i < data.questions.length; i++) {
+            var q = data.questions[i];
+            if (rendered[q.question_id]) continue;
+            rendered[q.question_id] = true;
+
+            var detailsHtml = '<div class="exam-detail-box">' +
+              '<b>Question ' + q.question_number + ':</b>' +
+              '<pre>' + escapeHtml(q.question_prompt) + '</pre>' +
+              '<b>Model response:</b> <span class="model-response-text ' + (q.is_correct ? 'correct-response' : 'incorrect-response') + '">' + escapeHtml(q.response) + '</span><br>' +
+              '<b>Correct option:</b> ' + escapeHtml(q.correct_option) +
+              '<span class="correctness-icon">' + (q.is_correct ? "✅" : "❌") + '</span>' +
+              '<div class="question-time">Time: ' + (q.question_time !== null ? q.question_time : "-") + 's</div>' +
+            '</div>';
+            $("#exam-details").append(detailsHtml);
+          }
+
+          if (data.status === "failed") {
+            clearInterval(interval);
+            $("#exam-results").html(
+              '<p class="error-message">Evaluation failed.</p>'
+            );
+            $("#loading-indicator").hide();
+            $("#progress-bar").css("width", "100%").text("Failed");
+            return;
+          }
+
+          if (data.status === "completed" || (data.questions.length >= totalQuestions && totalQuestions > 0)) {
+            clearInterval(interval);
+            var examLink = '/exam/' + examId + '/?eval_id=' + evalId;
+            $("#exam-results").html(
+              '<p>Evaluation complete. <a href="' + examLink + '">View exam details</a></p>'
+            );
+            $("#loading-indicator").hide();
+            $("#progress-bar").css("width", "100%").text("Done");
+          }
+        })
+        .catch(function() {
+          retries++;
+          if (retries >= MAX_RETRIES) {
+            clearInterval(interval);
+            $("#exam-results").html(
+              '<p class="error-message">Lost connection to server. Please reload the page.</p>'
+            );
+            $("#loading-indicator").hide();
+          }
+        });
+    }, 2000);
+    return interval;
+  }
+
+  function handleQueuedEvaluation(data) {
+    sessionStorage.setItem("eval_task_ids", JSON.stringify(data.task_ids));
+
+    $("#progress-bar")
+      .removeAttr("style")
+      .addClass("progress-bar-custom")
+      .text("Queued");
+
+    pollBatchTasks(data.task_ids, function(finished, total, results, pending) {
+      var percent = Math.round((finished / total) * 100);
+      $("#progress-bar").css("width", percent + "%").text(finished + "/" + total);
+    }, function(results) {
+      // All tasks done — final progress set by pollSingleExamQuestions
+    }, 2000);
+
+    pollSingleExamQuestions(data.evaluation_id, data.exam_id);
+
+    if (window.addPendingEvaluation && data.evaluation_id && data.exam_id) {
+      window.addPendingEvaluation(data.evaluation_id, data.exam_id);
+    }
+  }
+
   $("#exam-form").submit(function (event) {
     event.preventDefault();
 
@@ -76,7 +170,10 @@ $(document).ready(function () {
     fetch("/upload/", {
       method: "POST",
       body: formData,
-      headers: { "Cache-Control": "no-cache" },
+      headers: {
+        "Cache-Control": "no-cache",
+        "X-CSRFToken": getCookie("csrftoken"),
+      },
     })
       .then((response) => {
         if (!response.ok) {
@@ -94,16 +191,13 @@ $(document).ready(function () {
           return handleErrorResponse(response, "There was an error processing the file.");
         }
 
-        const contentType = response.headers.get("content-type");
-        if (contentType && contentType.indexOf("application/json") !== -1) {
-          return response.json().then((data) => {
-            if (data.status === "success") {
-              window.location.href = `/exam/${data.exam_id}/`;
+        return response.json().then((data) => {
+            if (data.status === "queued" && data.task_ids) {
+              handleQueuedEvaluation(data);
+            } else if (data.status === "success") {
+              window.location.href = "/exam/" + data.exam_id + "/";
             }
           });
-        }
-
-        return handleStreamingResponse(response, updateUI);
       })
       .catch((error) => {
         if (duplicateConflictHandled) {

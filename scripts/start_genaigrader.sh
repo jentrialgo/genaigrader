@@ -72,5 +72,11 @@ tmux send-keys -t "$SESSION_NAME" "uv run gunicorn $GUNICORN_APP \
     --timeout 6000 \
     --env DJANGO_SETTINGS_MODULE=$SETTINGS_MODULE > debug.log 2>&1 &" C-m
 
+# Start django-q2 worker in a split pane
+tmux split-window -t "$SESSION_NAME" -v
+tmux send-keys -t "$SESSION_NAME" "cd $PROJECT_DIR" C-m
+tmux send-keys -t "$SESSION_NAME" "set -a; source $ENV_FILE; set +a" C-m
+tmux send-keys -t "$SESSION_NAME" "uv run manage.py qcluster --settings=$SETTINGS_MODULE" C-m
+
 echo "🟢 App running at: https://$NGROK_URL"
 echo "📦 tmux session: $SESSION_NAME"

@@ -1,5 +1,9 @@
+import logging
+
+from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.http import HttpResponse, JsonResponse, StreamingHttpResponse
+from django.http import HttpResponse, JsonResponse
+from django_q.tasks import async_task
 
 from genaigrader.llm_api import LlmApi
 from genaigrader.models import Exam, Question, QuestionOption
@@ -11,7 +15,10 @@ from genaigrader.services.exam_service import (
 )
 from genaigrader.services.file_service import save_uploaded_file
 from genaigrader.services.model_service import get_or_create_model
-from genaigrader.services.stream_service import stream_responses
+from genaigrader.services.stream_service import create_evaluation_stub
+from genaigrader.tasks import EVALUATION_TASK_TIMEOUT, evaluate_question_task
+
+logger = logging.getLogger(__name__)
 
 
 def validate_model(request):
@@ -68,10 +75,16 @@ def handle_file_upload(request):
     if request.method != "POST":
         return HttpResponse("Method not allowed", status=405)
 
+    uploaded_file = request.FILES.get("file")
+    if not uploaded_file:
+        return JsonResponse(
+            {"status": "error", "message": "No file provided"},
+            status=400,
+        )
+
     try:
         # Step 1: initial validations
         course = get_or_create_course(request)
-        uploaded_file = request.FILES["file"]
         user = request.user
 
         # Step 2: model validation
@@ -102,24 +115,45 @@ def handle_file_upload(request):
             uploaded_file, course, request.user, request, questions_data
         )
 
-        # Step 6: stream LLM response or return success for pure upload
+        # Step 6: enqueue LLM evaluation tasks or return success for pure upload
         if llm:
             user_prompt = request.POST.get("user_prompt", "")
             notes = request.POST.get("notes", "")
-            stream = stream_responses(
-                Question.objects.filter(exam=exam),
-                user_prompt,
-                llm,
-                len(questions_data),
-                exam,
-                notes,
+            eval_stub = create_evaluation_stub(
+                exam.id, llm.model_obj.id, user_prompt, notes
             )
-            return StreamingHttpResponse(stream, content_type="text/event-stream")
+            task_ids = []
+            for question in exam.question_set.all():
+                task_id = async_task(
+                    evaluate_question_task,
+                    eval_stub.id,
+                    question.id,
+                    user_prompt,
+                    group=f"eval:{eval_stub.id}",
+                    timeout=EVALUATION_TASK_TIMEOUT,
+                )
+                task_ids.append(task_id)
+            return JsonResponse(
+                {
+                    "status": "queued",
+                    "evaluation_id": eval_stub.id,
+                    "task_ids": task_ids,
+                    "total_tasks": len(task_ids),
+                    "exam_id": exam.id,
+                    "message": "Exam created and evaluation queued",
+                }
+            )
 
         return JsonResponse({"status": "success", "exam_id": exam.id})
 
-    except Exception as e:
-        return HttpResponse(f"Error: {str(e)}", status=400)
+    except (ValueError, KeyError, ValidationError) as e:
+        logger.exception("File upload failed: client error")
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)
+    except Exception:
+        logger.exception("File upload failed: unexpected error")
+        return JsonResponse(
+            {"status": "error", "message": "Internal server error"}, status=500
+        )
 
 
 def find_exam_name_conflict(uploaded_file, course, user, request):

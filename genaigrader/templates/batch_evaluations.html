@@ -87,7 +87,7 @@
 <div id="batch-eval-errors"></div>
 
 <!-- Results Table -->
-<table id="batch-eval-table" class="batch-eval-table" style="width:100%;margin-top:1em;display:none;">
+<table id="batch-eval-table" class="batch-eval-table">
   <thead>
     <tr>
       <th>Date</th>
@@ -109,6 +109,6 @@
 
 {% block extra_scripts %}
   <link rel="stylesheet" href="{% static 'css/batch_evaluations.css' %}">
-  <script src="{% static 'js/evaluate_utils.js' %}"></script>
-  <script src="{% static 'js/batch_evaluations.js' %}"></script>
+  <script src="{% static 'js/polling.js' %}?v=2"></script>
+  <script src="{% static 'js/batch_evaluations.js' %}?v=2"></script>
 {% endblock %}

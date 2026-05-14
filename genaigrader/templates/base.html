@@ -46,6 +46,8 @@
   <div class="section">
     {% block content %}{% endblock %}
   </div>
+  <div id="toast-container" class="toast-container"></div>
+  <script src="{% static 'js/notifications.js' %}?v=2"></script>
   {% block extra_scripts %}{% endblock %}
 </body>
 </html>

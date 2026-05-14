@@ -91,7 +91,7 @@ class UploadFileTestCase(TestCase):
         """This test case checks the behavior when an error occurs during file processing.
         It should not create any exam or questions."""
         # Mock process_exam_file to raise an exception
-        mock_process_exam_file.side_effect = Exception("Error processing file")
+        mock_process_exam_file.side_effect = RuntimeError("Error processing file")
 
         # Create a mock uploaded file. it's not important for this test
         # since we are triggering an error, but we need to provide one
@@ -104,9 +104,15 @@ class UploadFileTestCase(TestCase):
         self.assertEqual(Exam.objects.count(), 0)
         self.assertEqual(Question.objects.count(), 0)
 
-    def test_upload_file_success_creates_exam_and_questions(self):
+    @patch("genaigrader.services.ollama_version_service.get_ollama_version")
+    @patch("genaigrader.services.upload_file_service.async_task")
+    def test_upload_file_success_creates_exam_and_questions(
+        self, mock_async, mock_ollama_version
+    ):
         """This test case checks the behavior when a valid exam file is uploaded.
         It should return a 200 status code and create an exam and questions."""
+        mock_async.return_value = "fake-task-id"
+        mock_ollama_version.return_value = None
         # Create a mock uploaded file
         request = self._mock_request(file_content=VALID_EXAM_FILE_CONTENT.encode())
 
@@ -206,8 +212,14 @@ class UploadFileTestCase(TestCase):
         self.assertEqual(Exam.objects.count(), 1)
         self.assertEqual(Question.objects.count(), 0)
 
-    def test_upload_allows_same_exam_name_in_different_course(self):
+    @patch("genaigrader.services.ollama_version_service.get_ollama_version")
+    @patch("genaigrader.services.upload_file_service.async_task")
+    def test_upload_allows_same_exam_name_in_different_course(
+        self, mock_async, mock_ollama_version
+    ):
         """Exam names are unique per course, so same name in another course is allowed."""
+        mock_async.return_value = "fake-task-id"
+        mock_ollama_version.return_value = None
         other_course = Course.objects.create(name="Other Course", user=self.user)
         Exam.objects.create(description="test.txt", course=self.course, user=self.user)
 
