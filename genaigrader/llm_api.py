@@ -7,6 +7,10 @@ import openai
 from django.core.exceptions import ValidationError
 from django.core.validators import URLValidator
 
+# Process-level cache of validated model IDs so connectivity checks
+# (e.g. ``models.list()``) are only performed once per model in a worker.
+_validated_model_ids: set = set()
+
 
 def is_private_url(url):
     """Return True if url resolves to a private, loopback, or reserved IP.
@@ -55,6 +59,7 @@ class LlmApi:
         """
         self.model_obj = model_obj
         self.client = None  # Initialize client lazily after successful validation.
+        self.ollama_client = None
 
     def validate(self):
         """
@@ -63,6 +68,12 @@ class LlmApi:
         Raises:
         - ValueError: If any required fields are missing or incorrectly formatted.
         """
+        if getattr(self.model_obj, "_validated", False):
+            return
+        if self.model_obj.id and self.model_obj.id in _validated_model_ids:
+            self.model_obj._validated = True
+            return
+
         errors = []
 
         if not self.model_obj.description:
@@ -92,7 +103,9 @@ class LlmApi:
                 try:
                     # Create the client only when basic validation passes.
                     self.client = openai.OpenAI(
-                        api_key=self.model_obj.api_key, base_url=self.model_obj.api_url
+                        api_key=self.model_obj.api_key,
+                        base_url=self.model_obj.api_url,
+                        timeout=300,
                     )
                     # Perform a connectivity test request.
                     self.client.models.list()  # External API connectivity test.
@@ -110,6 +123,10 @@ class LlmApi:
                     errors.append(f"Error trying to validate model: {e}")
         if errors:
             raise ValueError("\n".join([f"Model error: {e}" for e in errors]))
+
+        self.model_obj._validated = True
+        if self.model_obj.id:
+            _validated_model_ids.add(self.model_obj.id)
 
     def _strip_think_tags(self, text):
         """
@@ -221,7 +238,9 @@ class LlmApi:
         Raises:
         - ValueError: If an error occurs during local model execution.
         """
-        response_stream = ollama.chat(
+        if self.ollama_client is None:
+            self.ollama_client = ollama.Client(timeout=300)
+        response_stream = self.ollama_client.chat(
             model=self.model_obj.description,
             messages=[{"role": "user", "content": prompt}],
             stream=True,

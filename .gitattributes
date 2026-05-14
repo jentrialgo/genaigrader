@@ -1,0 +1,4 @@
+# Shell scripts and Docker files must stay LF
+*.sh    text eol=lf
+Dockerfile* text eol=lf
+.dockerignore text eol=lf

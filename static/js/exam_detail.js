@@ -1,21 +1,56 @@
-// Function to get CSRF token
-function getCookie(name) {
-    let cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-        const cookies = document.cookie.split(';');
-        for (let i = 0; i < cookies.length; i++) {
-            const cookie = cookies[i].trim();
-            if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                break;
-            }
-        }
-    }
-    return cookieValue;
-}
-
 // DataTables configuration
 $(document).ready(function() {
+    // Poll for evaluation task completion if eval_id is in the URL
+    var urlParams = new URLSearchParams(window.location.search);
+    var evalId = urlParams.get('eval_id');
+    if (evalId) {
+        var taskIds = JSON.parse(sessionStorage.getItem("eval_task_ids") || "[]");
+        if (taskIds.length) {
+            var activePoller = null;
+            var renderedTasks = {};
+            var pollStartTimer = null;
+
+            function cleanupPolling() {
+                sessionStorage.removeItem("eval_task_ids");
+                if (activePoller) {
+                    activePoller.stop();
+                    activePoller = null;
+                }
+                if (pollStartTimer) {
+                    clearTimeout(pollStartTimer);
+                    pollStartTimer = null;
+                }
+            }
+
+            $(window).on("beforeunload", cleanupPolling);
+
+            pollStartTimer = setTimeout(function() {
+                activePoller = pollBatchTasks(taskIds, function(finished, total, results, pending) {
+                    var pct = Math.round((finished / total) * 100);
+                    $('#eval-progress-fill').css('width', pct + '%');
+                    $('#eval-progress-text').text(finished + ' / ' + total);
+
+                    for (var i = 0; i < results.length; i++) {
+                        var r = results[i];
+                        if (r.status === 'success' && r.result && !renderedTasks[r.task_id]) {
+                            renderedTasks[r.task_id] = true;
+                            appendQuestionResult(r.result);
+                        } else if (r.status === 'failed' && !renderedTasks[r.task_id]) {
+                            renderedTasks[r.task_id] = true;
+                            appendQuestionResult({error: r.result || 'Task failed', task_id: r.task_id});
+                        }
+                    }
+                }, function(results) {
+                    // All tasks finished – confirm via evaluation status endpoint
+                    checkEvaluationComplete(evalId, function() {
+                        cleanupPolling();
+                        window.location.search = '';
+                    });
+                }, 2000);
+            }, 1000);
+        }
+    }
+
     $('#evaluationsTable').DataTable({
         dom: 'Bfrtip',
         buttons: [
@@ -80,6 +115,71 @@ $(document).ready(function() {
         }
     });
 });
+
+function appendQuestionResult(result) {
+    var $container = $('#live-evaluation-results');
+    if ($container.length === 0) return;
+
+    if (result.error) {
+        $container.append(
+            '<div class="eval-question-card eval-question-error">' +
+            '<b>Error:</b> ' + escapeHtml(result.error) +
+            '</div>'
+        );
+        return;
+    }
+
+    var correctnessClass = result.is_correct ? 'correct-response' : 'incorrect-response';
+    var icon = result.is_correct ? '✅' : '❌';
+    var html =
+        '<div class="eval-question-card">' +
+        '<div class="eval-question-header">Question ' + result.question_id + ' ' + icon + '</div>' +
+        '<div class="eval-question-body">' +
+        '<b>Response:</b> <span class="model-response-text ' + correctnessClass + '">' + escapeHtml(result.response) + '</span><br>' +
+        '<b>Time:</b> ' + (result.question_time || '-') + 's' +
+        '</div>' +
+        '</div>';
+    $container.append(html);
+}
+
+function escapeHtml(text) {
+    if (!text) return '';
+    return $('<div>').text(text).html();
+}
+
+function checkEvaluationComplete(evalId, onComplete) {
+    var attempts = 0;
+    var maxAttempts = 30;
+    function check() {
+        fetch('/evaluation/' + evalId + '/status/')
+            .then(function(r) {
+                var ct = r.headers.get("content-type") || "";
+                if (!r.ok || r.redirected || ct.indexOf("application/json") === -1) {
+                    throw new Error("Invalid response or session expired");
+                }
+                return r.json();
+            })
+            .then(function(data) {
+                if (data.status === 'completed' || data.status === 'failed') {
+                    onComplete();
+                } else if (attempts < maxAttempts) {
+                    attempts++;
+                    setTimeout(check, 2000);
+                } else {
+                    onComplete();
+                }
+            })
+            .catch(function() {
+                if (attempts < maxAttempts) {
+                    attempts++;
+                    setTimeout(check, 2000);
+                } else {
+                    onComplete();
+                }
+            });
+    }
+    check();
+}
 
 function deleteEvaluation(button) {
     const row = $(button).closest('tr');

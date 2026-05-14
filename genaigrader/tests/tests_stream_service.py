@@ -1,163 +1,366 @@
-import json
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 from django.contrib.auth import get_user_model
-from django.test import Client, TestCase
+from django.test import TestCase
 
-from genaigrader.models import Course, Evaluation, Exam, Model, QuestionEvaluation
-
-from ..services.stream_service import process_question, stream_responses
+from genaigrader.models import (
+    Course,
+    Evaluation,
+    Exam,
+    Model,
+    Question,
+    QuestionEvaluation,
+    QuestionOption,
+)
+from genaigrader.services.stream_service import (
+    compute_evaluation_summary,
+    create_evaluation_stub,
+    evaluate_single_question,
+)
 
 User = get_user_model()
 
 
-class StreamServiceTest(TestCase):
+def _create_exam_with_questions(user, course, model, num_questions=1):
+    exam = Exam.objects.create(course=course, description="Test Exam", user=user)
+    questions = []
+    for i in range(num_questions):
+        question = Question.objects.create(statement=f"What is {i}+{i}?", exam=exam)
+        option_a = QuestionOption.objects.create(content=f"a) {i}", question=question)
+        option_b = QuestionOption.objects.create(
+            content=f"b) {i + i}", question=question
+        )
+        question.correct_option = option_b
+        question.save()
+        questions.append((question, option_a, option_b))
+    return exam, questions
+
+
+class CreateEvaluationStubTest(TestCase):
     def setUp(self):
-        self.client = Client()
         self.user = User.objects.create_user(
             username="testuser", email="testuser@example.com", password="password"
         )
-        self.client.force_login(self.user)
-
-        # Create related data
         self.course = Course.objects.create(name="Test Course", user=self.user)
         self.model = Model.objects.create(description="Test Model")
-        self.exam = Exam.objects.create(
-            course=self.course, description="Test Exam", user=self.user
+
+    @patch("genaigrader.services.ollama_version_service.get_ollama_version")
+    def test_create_evaluation_stub_success(self, mock_ollama_version):
+        mock_ollama_version.return_value = None
+        exam, _ = _create_exam_with_questions(
+            self.user, self.course, self.model, num_questions=3
         )
 
-    @patch("genaigrader.services.stream_service.get_evaluation_ollama_version")
-    @patch("genaigrader.services.stream_service.QuestionEvaluation")
-    def test_stream_responses_handles_api_error(
-        self, mock_question_evaluation, mock_ollama_version
-    ):
-        """
-        Test that when an external model API call fails, stream_responses
-        yields a data object containing an error message for batch_evaluations.js
-        """
-        mock_ollama_version.return_value = "test-version"
-
-        # Setup mock QuestionEvaluation to avoid Django validation errors
-        mock_question_evaluation_instance = Mock()
-        mock_question_evaluation.objects.create.return_value = (
-            mock_question_evaluation_instance
+        evaluation = create_evaluation_stub(
+            exam.id, self.model.id, user_prompt="Custom prompt", notes="test notes"
         )
 
-        # Setup
-        mock_question = Mock()
-        mock_question.id = 1
-        mock_question.statement = "Test question"
-        mock_question.correct_option.content = "a"
-        mock_questions = [mock_question]
+        self.assertEqual(evaluation.exam, exam)
+        self.assertEqual(evaluation.model, self.model)
+        self.assertEqual(evaluation.status, "pending")
+        self.assertEqual(evaluation.total_questions, 3)
+        self.assertIn("Custom prompt", evaluation.prompt)
+        self.assertEqual(evaluation.notes, "test notes")
 
-        # Create a mock for the questionoption_set
-        mock_options_queryset = MagicMock()
-        mock_options_queryset.all.return_value.order_by.return_value = (
-            []
-        )  # Empty iterable
-        mock_question.questionoption_set = mock_options_queryset
-
-        mock_user_prompt = "test prompt"
-
-        # Create mock LLM that will throw an Exception when generate_response is called
-        mock_llm = Mock()
-        mock_llm.model_obj = self.model
-        mock_llm.generate_response.side_effect = Exception("API call failed")
-
-        mock_total_questions = 1
-        mock_exam = self.exam
-
-        # Execute
-        response_generator = stream_responses(
-            mock_questions, mock_user_prompt, mock_llm, mock_total_questions, mock_exam
-        )
-        responses = list(response_generator)  # Consume the generator
-
-        # We should have exactly one response with an error
-        self.assertEqual(
-            len(responses), 1, "Expected exactly one response containing an error"
+    def test_create_evaluation_stub_no_questions_raises(self):
+        exam = Exam.objects.create(
+            course=self.course, description="Empty Exam", user=self.user
         )
 
-        # Parse the response to check for the error
-        response = responses[0]
-        self.assertTrue(
-            response.startswith("data: "), "Response should start with 'data: '"
+        with self.assertRaises(ValueError) as cm:
+            create_evaluation_stub(exam.id, self.model.id)
+
+        self.assertIn("has no questions", str(cm.exception))
+
+
+class ComputeEvaluationSummaryTest(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="testuser", email="testuser@example.com", password="password"
+        )
+        self.course = Course.objects.create(name="Test Course", user=self.user)
+        self.model = Model.objects.create(description="Test Model")
+        self.exam, self.questions = _create_exam_with_questions(
+            self.user, self.course, self.model, num_questions=2
         )
 
-        data = json.loads(response[6:].strip())  # Skip the "data: " prefix
+    def test_compute_evaluation_summary_all_correct(self):
+        from django.utils import timezone
 
-        # Verify error data
-        self.assertIn("error", data, "Response should contain an error field")
-        self.assertIn("API call failed", data["error"])
-        self.assertEqual(data["processed_questions"], 1)
-        self.assertEqual(data["total_questions"], mock_total_questions)
-        self.assertEqual(data["correct_count"], 0)
-
-        # Verify that no Evaluation or Questions were added to the database
-        self.assertEqual(
-            Evaluation.objects.count(),
-            0,
-            "No Evaluation should be created when an error occurs",
+        evaluation = Evaluation.objects.create(
+            prompt="test",
+            ev_date=timezone.now(),
+            grade=0,
+            time=0,
+            model=self.model,
+            exam=self.exam,
         )
-        self.assertEqual(
-            QuestionEvaluation.objects.count(),
-            0,
-            "No Questions should be created when an error occurs",
-        )
-
-    @patch("genaigrader.services.stream_service.QuestionEvaluation")
-    @patch("genaigrader.services.stream_service.generate_prompt")
-    def test_process_question_handles_api_error(
-        self, mock_generate_prompt, mock_question_evaluation
-    ):
-        """
-        Test that when the LlmApi raises an exception, process_question propagates the exception
-        and no QuestionEvaluation is created
-        """
-        # Setup for generate_prompt mock
-        mock_prompt_data = {
-            "question_prompt": "Test question",
-            "user_prompt": "Test user prompt",
-            "prompt": "Full test prompt",
-        }
-        mock_generate_prompt.return_value = mock_prompt_data
-
-        # Setup for question
-        mock_question = Mock()
-        mock_question.id = 1
-        mock_question.statement = "Test question"
-        mock_question.correct_option.content = "a"
-
-        # Create a mock for questionoption_set
-        mock_options_queryset = MagicMock()
-        mock_options_queryset.all.return_value.order_by.return_value = []
-        mock_question.questionoption_set = mock_options_queryset
-
-        # Create mock LLM that will throw an Exception when generate_response is called
-        mock_llm = Mock()
-        mock_llm.model_obj = self.model
-        mock_llm.generate_response.side_effect = Exception("API call failed")
-
-        question_evaluations = []
-
-        # Execute and assert that the exception is propagated
-        with self.assertRaises(Exception) as context:
-            process_question(
-                correct_count=0,
-                index=0,
-                question=mock_question,
-                user_prompt="Test prompt",
-                llm=mock_llm,
-                total_questions=1,
-                evaluation=Mock(),
-                question_evaluations=question_evaluations,
+        for q, _, opt_b in self.questions:
+            QuestionEvaluation.objects.create(
+                evaluation=evaluation,
+                question=q,
+                question_option=opt_b,
+                is_correct=True,
             )
 
-        # Verify the exception message
+        grade, total_time = compute_evaluation_summary(evaluation)
+        self.assertEqual(grade, 10.0)
+        self.assertGreaterEqual(total_time, 0)
+
+    def test_compute_evaluation_summary_half_correct(self):
+        from django.utils import timezone
+
+        evaluation = Evaluation.objects.create(
+            prompt="test",
+            ev_date=timezone.now(),
+            grade=0,
+            time=0,
+            model=self.model,
+            exam=self.exam,
+        )
+        q0, opt_a0, opt_b0 = self.questions[0]
+        q1, _, opt_b1 = self.questions[1]
+        QuestionEvaluation.objects.create(
+            evaluation=evaluation,
+            question=q0,
+            question_option=opt_a0,
+            is_correct=False,
+        )
+        QuestionEvaluation.objects.create(
+            evaluation=evaluation,
+            question=q1,
+            question_option=opt_b1,
+            is_correct=True,
+        )
+
+        grade, total_time = compute_evaluation_summary(evaluation)
+        self.assertEqual(grade, 5.0)
+
+    def test_compute_evaluation_summary_no_question_evaluations(self):
+        from django.utils import timezone
+
+        evaluation = Evaluation.objects.create(
+            prompt="test",
+            ev_date=timezone.now(),
+            grade=0,
+            time=0,
+            model=self.model,
+            exam=self.exam,
+        )
+
+        grade, total_time = compute_evaluation_summary(evaluation)
+        self.assertEqual(grade, 0.0)
+        self.assertEqual(total_time, 0.0)
+
+
+class EvaluateSingleQuestionTest(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="testuser", email="testuser@example.com", password="password"
+        )
+        self.course = Course.objects.create(name="Test Course", user=self.user)
+        self.model = Model.objects.create(description="Test Model")
+        self.exam, self.questions = _create_exam_with_questions(
+            self.user, self.course, self.model, num_questions=1
+        )
+        self.question, self.option_a, self.option_b = self.questions[0]
+        from django.utils import timezone
+
+        self.evaluation = Evaluation.objects.create(
+            prompt="test",
+            ev_date=timezone.now(),
+            grade=0,
+            time=0,
+            model=self.model,
+            exam=self.exam,
+            status="pending",
+            total_questions=1,
+        )
+
+    @patch("genaigrader.services.stream_service.generate_prompt")
+    def test_evaluate_single_question_correct_answer(self, mock_generate_prompt):
+        mock_generate_prompt.return_value = {
+            "question_prompt": "What is 0+0?",
+            "user_prompt": "Test prompt",
+            "prompt": "Full test prompt",
+        }
+
+        mock_llm = Mock()
+        mock_llm.model_obj = self.model
+        mock_llm.generate_response.return_value = ["b) 0"]
+
+        with patch("genaigrader.services.stream_service.LlmApi", return_value=mock_llm):
+            result = evaluate_single_question(
+                self.evaluation.id, self.question.id, "Test prompt"
+            )
+
+        self.assertTrue(result["is_correct"])
+        self.assertEqual(result["response"], "b")
+        self.assertTrue(result["evaluation_complete"])
+        self.assertEqual(result["grade"], 10.0)
+
+        self.evaluation.refresh_from_db()
+        self.assertEqual(self.evaluation.status, "completed")
+        self.assertEqual(self.evaluation.grade, 10.0)
+
+        qe = QuestionEvaluation.objects.filter(evaluation=self.evaluation).first()
+        self.assertEqual(qe.question_option, self.option_b)
+        self.assertEqual(qe.response_text, "b")
+
+    @patch("genaigrader.services.stream_service.generate_prompt")
+    def test_evaluate_single_question_incorrect_answer(self, mock_generate_prompt):
+        mock_generate_prompt.return_value = {
+            "question_prompt": "What is 0+0?",
+            "user_prompt": "Test prompt",
+            "prompt": "Full test prompt",
+        }
+
+        mock_llm = Mock()
+        mock_llm.model_obj = self.model
+        mock_llm.generate_response.return_value = ["a) 0"]
+
+        with patch("genaigrader.services.stream_service.LlmApi", return_value=mock_llm):
+            result = evaluate_single_question(
+                self.evaluation.id, self.question.id, "Test prompt"
+            )
+
+        self.assertFalse(result["is_correct"])
+        self.assertEqual(result["response"], "a")
+        self.assertTrue(result["evaluation_complete"])
+
+        qe = QuestionEvaluation.objects.filter(evaluation=self.evaluation).first()
+        self.assertEqual(qe.response_text, "a")
+
+        self.evaluation.refresh_from_db()
+        self.assertEqual(self.evaluation.status, "completed")
+        self.assertEqual(self.evaluation.grade, 0.0)
+
+    @patch("genaigrader.services.stream_service.generate_prompt")
+    def test_evaluate_single_question_empty_llm_response(self, mock_generate_prompt):
+        mock_generate_prompt.return_value = {
+            "question_prompt": "What is 0+0?",
+            "user_prompt": "Test prompt",
+            "prompt": "Full test prompt",
+        }
+
+        mock_llm = Mock()
+        mock_llm.model_obj = self.model
+        mock_llm.generate_response.return_value = []
+
+        with patch("genaigrader.services.stream_service.LlmApi", return_value=mock_llm):
+            result = evaluate_single_question(
+                self.evaluation.id, self.question.id, "Test prompt"
+            )
+
+        self.assertEqual(result["response"], "")
+        self.assertFalse(result["is_correct"])
+        self.assertTrue(result["evaluation_complete"])
+
+        qe = QuestionEvaluation.objects.filter(evaluation=self.evaluation).first()
+        self.assertEqual(qe.response_text, "")
+
+    @patch("genaigrader.services.stream_service.generate_prompt")
+    def test_evaluate_single_question_api_error_marks_failed(
+        self, mock_generate_prompt
+    ):
+        mock_generate_prompt.return_value = {
+            "question_prompt": "What is 0+0?",
+            "user_prompt": "Test prompt",
+            "prompt": "Full test prompt",
+        }
+
+        mock_llm = Mock()
+        mock_llm.model_obj = self.model
+        mock_llm.generate_response.side_effect = RuntimeError("API call failed")
+
+        with patch("genaigrader.services.stream_service.LlmApi", return_value=mock_llm):
+            with self.assertRaises(RuntimeError) as context:
+                evaluate_single_question(
+                    self.evaluation.id, self.question.id, "Test prompt"
+                )
+
         self.assertEqual(str(context.exception), "API call failed")
 
-        # Verify that no QuestionEvaluation was created
-        mock_question_evaluation.assert_not_called()
+        self.evaluation.refresh_from_db()
+        self.assertEqual(self.evaluation.status, "failed")
+        self.assertEqual(self.evaluation.failed_question_id, self.question.id)
+        self.assertIn("API call failed", self.evaluation.failed_reason)
 
-        # Verify that question_evaluations list remains empty
-        self.assertEqual(len(question_evaluations), 0)
+        self.assertEqual(
+            QuestionEvaluation.objects.filter(evaluation=self.evaluation).count(), 0
+        )
+
+    @patch("genaigrader.services.stream_service.generate_prompt")
+    def test_evaluate_single_question_does_not_aggregate_when_not_last(
+        self, mock_generate_prompt
+    ):
+        # Create a second question so this evaluation has 2 total questions
+        q2 = Question.objects.create(statement="What is 1+1?", exam=self.exam)
+        QuestionOption.objects.create(content="a) 1", question=q2)
+        opt_b2 = QuestionOption.objects.create(content="b) 2", question=q2)
+        q2.correct_option = opt_b2
+        q2.save()
+
+        self.evaluation.total_questions = 2
+        self.evaluation.save()
+
+        mock_generate_prompt.return_value = {
+            "question_prompt": "What is 0+0?",
+            "user_prompt": "Test prompt",
+            "prompt": "Full test prompt",
+        }
+
+        mock_llm = Mock()
+        mock_llm.model_obj = self.model
+        mock_llm.generate_response.return_value = ["b) 0"]
+
+        with patch("genaigrader.services.stream_service.LlmApi", return_value=mock_llm):
+            result = evaluate_single_question(
+                self.evaluation.id, self.question.id, "Test prompt"
+            )
+
+        self.assertFalse(result["evaluation_complete"])
+        self.assertIsNone(result["grade"])
+
+        self.evaluation.refresh_from_db()
+        self.assertEqual(self.evaluation.status, "running")
+
+    @patch("genaigrader.services.stream_service.generate_prompt")
+    def test_evaluate_single_question_race_condition_safe(self, mock_generate_prompt):
+        """Simulate two tasks finishing concurrently; only one should aggregate."""
+        q2 = Question.objects.create(statement="What is 1+1?", exam=self.exam)
+        QuestionOption.objects.create(content="a) 1", question=q2)
+        opt_b2 = QuestionOption.objects.create(content="b) 2", question=q2)
+        q2.correct_option = opt_b2
+        q2.save()
+
+        self.evaluation.total_questions = 2
+        self.evaluation.save()
+
+        mock_generate_prompt.return_value = {
+            "question_prompt": "Test",
+            "user_prompt": "Test prompt",
+            "prompt": "Full test prompt",
+        }
+
+        mock_llm = Mock()
+        mock_llm.model_obj = self.model
+        mock_llm.generate_response.return_value = ["b) 0"]
+
+        with patch("genaigrader.services.stream_service.LlmApi", return_value=mock_llm):
+            result1 = evaluate_single_question(
+                self.evaluation.id, self.question.id, "Test prompt"
+            )
+            result2 = evaluate_single_question(self.evaluation.id, q2.id, "Test prompt")
+
+        # Exactly one of them should have triggered completion
+        self.assertTrue(
+            result1["evaluation_complete"] or result2["evaluation_complete"]
+        )
+        self.assertFalse(
+            result1["evaluation_complete"] and result2["evaluation_complete"]
+        )
+
+        self.evaluation.refresh_from_db()
+        self.assertEqual(self.evaluation.status, "completed")
+        self.assertEqual(self.evaluation.grade, 10.0)

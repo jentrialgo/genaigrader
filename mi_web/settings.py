@@ -57,6 +57,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "django_q",
     "allauth",
     "allauth.account",
     "allauth.socialaccount",
@@ -106,6 +107,9 @@ DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
         "NAME": BASE_DIR / "db.sqlite3",
+        "OPTIONS": {
+            "init_command": "PRAGMA journal_mode=WAL;",
+        },
     }
 }
 
@@ -285,3 +289,19 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 LOGIN_REDIRECT_URL = "home"  # Redirect here after logging in
 LOGOUT_REDIRECT_URL = "account_login"  # Redirect here after logging out
+
+Q_CLUSTER = {
+    "name": "genaigrader",
+    "workers": 1,
+    "timeout": 7200,
+    "retry": 7300,
+    "queue_limit": 50,
+    "bulk": 10,
+    "orm": "default",
+    "ack_failures": True,
+    "recycle": 1000,
+    # No pruning of successful Task records. django-q2's default (250) deletes
+    # older rows, and the progress bars count Task rows via /batch-task-status/.
+    "save_limit": 0,
+    "sync": False,
+}

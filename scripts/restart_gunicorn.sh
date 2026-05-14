@@ -70,4 +70,22 @@ tmux send-keys -t "$SESSION_NAME" "uv run gunicorn $GUNICORN_APP \
     --timeout 6000 \
     --env DJANGO_SETTINGS_MODULE=$SETTINGS_MODULE > debug_output.log 2>&1 &" C-m
 
-echo "✅ Gunicorn restart command sent to tmux session '$SESSION_NAME'."
+# Stop and restart qcluster
+pkill -f "manage.py qcluster" 2>/dev/null
+sleep 1
+
+# Reuse existing qcluster pane if it exists, otherwise create a new split.
+WORKER_PANE="${SESSION_NAME}.1"
+if tmux has-session -t "$WORKER_PANE" 2>/dev/null; then
+    tmux send-keys -t "$WORKER_PANE" C-c
+    tmux send-keys -t "$WORKER_PANE" "cd $PROJECT_DIR" C-m
+    tmux send-keys -t "$WORKER_PANE" "set -a; source $ENV_FILE; set +a" C-m
+    tmux send-keys -t "$WORKER_PANE" "uv run manage.py qcluster --settings=$SETTINGS_MODULE" C-m
+else
+    tmux split-window -t "$SESSION_NAME" -v
+    tmux send-keys -t "$SESSION_NAME" "cd $PROJECT_DIR" C-m
+    tmux send-keys -t "$SESSION_NAME" "set -a; source $ENV_FILE; set +a" C-m
+    tmux send-keys -t "$SESSION_NAME" "uv run manage.py qcluster --settings=$SETTINGS_MODULE" C-m
+fi
+
+echo "✅ Gunicorn + qcluster restart sent to tmux session '$SESSION_NAME'."

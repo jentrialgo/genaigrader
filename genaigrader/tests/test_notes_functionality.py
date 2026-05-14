@@ -4,12 +4,15 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 
 from genaigrader.models import Course, Evaluation, Exam, Model, Question, QuestionOption
-from genaigrader.services.stream_service import stream_responses
+from genaigrader.services.stream_service import (
+    create_evaluation_stub,
+    evaluate_single_question,
+)
 
 User = get_user_model()
 
 
-class NotesfunctionalityTest(TestCase):
+class NotesFunctionalityTest(TestCase):
     def setUp(self):
         """Set up test data"""
         self.user = User.objects.create_user(
@@ -21,11 +24,9 @@ class NotesfunctionalityTest(TestCase):
         )
         self.model = Model.objects.create(description="Test Model")
 
-        # Create a question with options
         self.question = Question.objects.create(
             statement="What is 2+2?", exam=self.exam
         )
-
         self.option_a = QuestionOption.objects.create(
             content="a) 3", question=self.question
         )
@@ -37,7 +38,6 @@ class NotesfunctionalityTest(TestCase):
 
     def test_evaluation_model_has_notes_field(self):
         """Test that the Evaluation model has a notes field with correct properties"""
-        # Create an evaluation with notes
         test_notes = "This exam was conducted on high-performance hardware"
         evaluation = Evaluation.objects.create(
             prompt="Test prompt",
@@ -49,7 +49,6 @@ class NotesfunctionalityTest(TestCase):
             notes=test_notes,
         )
 
-        # Verify the notes field was saved correctly
         saved_evaluation = Evaluation.objects.get(id=evaluation.id)
         self.assertEqual(saved_evaluation.notes, test_notes)
 
@@ -70,11 +69,10 @@ class NotesfunctionalityTest(TestCase):
 
     @patch("genaigrader.services.stream_service.generate_prompt")
     @patch("genaigrader.services.stream_service.get_evaluation_ollama_version")
-    def test_stream_responses_handles_notes_parameter(
+    def test_create_evaluation_stub_preserves_notes(
         self, mock_ollama_version, mock_generate_prompt
     ):
-        """Test that stream_responses correctly handles the notes parameter"""
-        # Mock dependencies
+        """Test that create_evaluation_stub correctly stores the notes parameter"""
         mock_ollama_version.return_value = "1.0.0"
         mock_generate_prompt.return_value = {
             "prompt": "Test prompt",
@@ -82,38 +80,48 @@ class NotesfunctionalityTest(TestCase):
             "user_prompt": "Test user prompt",
         }
 
-        # Create mock LLM
+        test_notes = "Hardware: AMD Ryzen 9, 32GB RAM"
+        evaluation = create_evaluation_stub(
+            self.exam.id, self.model.id, user_prompt="Test prompt", notes=test_notes
+        )
+
+        self.assertEqual(evaluation.notes, test_notes)
+
+    @patch("genaigrader.services.stream_service.generate_prompt")
+    @patch("genaigrader.services.stream_service.get_evaluation_ollama_version")
+    def test_evaluate_single_question_preserves_notes(
+        self, mock_ollama_version, mock_generate_prompt
+    ):
+        """Test that evaluation notes are preserved through the full question flow"""
+        mock_ollama_version.return_value = "1.0.0"
+        mock_generate_prompt.return_value = {
+            "prompt": "Test prompt",
+            "question_prompt": "What is 2+2?",
+            "user_prompt": "Test user prompt",
+        }
+
         mock_llm = Mock()
         mock_llm.model_obj = self.model
         mock_llm.generate_response.return_value = ["b"]
 
         test_notes = "Hardware: AMD Ryzen 9, 32GB RAM"
-
-        list(
-            stream_responses(
-                [self.question],
-                "Test user prompt",
-                mock_llm,
-                1,
-                self.exam,
-                notes=test_notes,
-            )
+        evaluation = create_evaluation_stub(
+            self.exam.id, self.model.id, user_prompt="Test prompt", notes=test_notes
         )
 
-        # Verify that an evaluation was created with the notes
-        evaluations = Evaluation.objects.filter(exam=self.exam)
-        self.assertEqual(evaluations.count(), 1)
+        with patch("genaigrader.services.stream_service.LlmApi", return_value=mock_llm):
+            evaluate_single_question(evaluation.id, self.question.id, "Test prompt")
 
-        created_evaluation = evaluations.first()
-        self.assertEqual(created_evaluation.notes, test_notes)
+        evaluation.refresh_from_db()
+        self.assertEqual(evaluation.status, "completed")
+        self.assertEqual(evaluation.notes, test_notes)
 
     @patch("genaigrader.services.stream_service.generate_prompt")
     @patch("genaigrader.services.stream_service.get_evaluation_ollama_version")
-    def test_stream_responses_works_without_notes(
+    def test_evaluate_single_question_works_without_notes(
         self, mock_ollama_version, mock_generate_prompt
     ):
-        """Test that stream_responses works correctly when no notes are provided"""
-        # Mock dependencies
+        """Test that evaluation works correctly when no notes are provided"""
         mock_ollama_version.return_value = "1.0.0"
         mock_generate_prompt.return_value = {
             "prompt": "Test prompt",
@@ -121,24 +129,17 @@ class NotesfunctionalityTest(TestCase):
             "user_prompt": "Test user prompt",
         }
 
-        # Create mock LLM
         mock_llm = Mock()
         mock_llm.model_obj = self.model
         mock_llm.generate_response.return_value = ["b"]
 
-        list(
-            stream_responses(
-                [self.question],
-                "Test user prompt",
-                mock_llm,
-                1,
-                self.exam,
-            )
+        evaluation = create_evaluation_stub(
+            self.exam.id, self.model.id, user_prompt="Test prompt"
         )
 
-        # Verify that an evaluation was created with null notes
-        evaluations = Evaluation.objects.filter(exam=self.exam)
-        self.assertEqual(evaluations.count(), 1)
+        with patch("genaigrader.services.stream_service.LlmApi", return_value=mock_llm):
+            evaluate_single_question(evaluation.id, self.question.id, "Test prompt")
 
-        created_evaluation = evaluations.first()
-        self.assertIsNone(created_evaluation.notes)
+        evaluation.refresh_from_db()
+        self.assertEqual(evaluation.status, "completed")
+        self.assertIsNone(evaluation.notes)

@@ -21,6 +21,28 @@ services:
       - /app/.venv
     command: uv run manage.py runserver 0.0.0.0:8000
 
+  worker:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    depends_on:
+      - web
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+      - UV_LINK_MODE=copy
+      - DJANGO_DEBUG=1
+      - PYTHONUNBUFFERED=1
+      - RUN_MIGRATIONS=0
+      - RUN_COLLECTSTATIC=0
+    env_file:
+      - ../.env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ..:/app
+      - /app/.venv
+    command: uv run manage.py qcluster
+
   ollama:
     image: ollama/ollama:latest
     container_name: genaigrader-ollama

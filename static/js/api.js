@@ -1,13 +1,4 @@
 document.addEventListener("DOMContentLoaded", () => {
-    const getCookie = (name) => {
-        const cookies = document.cookie.split(';');
-        for(let cookie of cookies) {
-            const [key, value] = cookie.trim().split('=');
-            if(key === name) return decodeURIComponent(value);
-        }
-        return null;
-    };
-
     const getContrastColor = (hex) => {
         if (!hex || !hex.startsWith('#') || (hex.length !== 7 && hex.length !== 4)) {
             return '#ffffff';
@@ -201,10 +192,9 @@ document.getElementById('download-form').addEventListener('submit', function(e) 
     e.preventDefault();
     const modelName = document.getElementById('model-name').value;
     const messageBox = document.getElementById('message');
-    
-    // Reset message
+
     messageBox.style.display = 'block';
-    messageBox.textContent = 'Starting download...';
+    messageBox.textContent = 'Enqueuing download...';
     messageBox.className = 'message info';
 
     fetch('/model/pull/', {
@@ -215,54 +205,42 @@ document.getElementById('download-form').addEventListener('submit', function(e) 
         },
         body: JSON.stringify({ model: modelName })
     })
-    .then(response => {
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        
-        function read() {
-            return reader.read().then(({ done, value }) => {
-                if (done) return;
-                
-                // Process each chunk
-                const chunks = decoder.decode(value).split('\n');
-                
-                chunks.forEach(chunk => {
-                    if (!chunk.trim()) return;
-                    
-                    try {
-                        const data = JSON.parse(chunk);
-                        
-                        switch(data.status) {
-                            case 'progress':
-                                messageBox.textContent = data.message;
-                                messageBox.className = 'message info';
-                                break;
-                                
-                            case 'success':
-                                messageBox.textContent = data.message;
-                                messageBox.className = 'message success';
-                                setTimeout(() => location.reload(), 2000);
-                                break;
-                                
-                            case 'error':
-                                messageBox.textContent = data.message;
-                                messageBox.className = 'message error';
-                                break;
-                        }
-                    } catch(e) {
-                        console.error('Error parsing chunk:', e);
-                    }
-                });
-                
-                return read();
+    .then(function(response) {
+        if (!response.ok) {
+            return response.json().then(function(data) {
+                throw new Error(data.message || 'Request failed');
             });
         }
-        
-        return read();
+        return response.json();
     })
-    .catch(error => {
-        console.error('Error:', error);
-        messageBox.textContent = 'Connection error';
+    .then(function(data) {
+        if (data.status === 'queued') {
+            messageBox.textContent = 'Downloading ' + modelName + '...';
+            messageBox.className = 'message info';
+            if (window.addPendingDownload && data.task_id) {
+                window.addPendingDownload(data.task_id, modelName);
+            }
+            pollTask(data.task_id, function(status, result) {
+                if (status === 'success') {
+                    messageBox.textContent = 'Model downloaded successfully!';
+                    messageBox.className = 'message success';
+                    setTimeout(function() { location.reload(); }, 2000);
+                } else if (status === 'failed') {
+                    messageBox.textContent = 'Download failed: ' + (result || 'Unknown error');
+                    messageBox.className = 'message error';
+                }
+            });
+        } else if (data.status === 'success') {
+            messageBox.textContent = 'Model already downloaded.';
+            messageBox.className = 'message success';
+            setTimeout(function() { location.reload(); }, 1500);
+        } else {
+            messageBox.textContent = data.message || 'Unexpected response';
+            messageBox.className = 'message error';
+        }
+    })
+    .catch(function(error) {
+        messageBox.textContent = error.message || 'Connection error';
         messageBox.className = 'message error';
     });
 });

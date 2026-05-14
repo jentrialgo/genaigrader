@@ -27,6 +27,9 @@ fi
 # Kill ngrok if running inside tmux
 tmux send-keys -t "$SESSION_NAME" "pkill ngrok" C-m
 
+# Stop qcluster if running
+pkill -f "manage.py qcluster" 2>/dev/null && echo "✅ qcluster stopped." || echo "ℹ️ qcluster not running."
+
 # Optionally kill the tmux session
 tmux kill-session -t "$SESSION_NAME" 2>/dev/null
 echo "🛑 Deployment stopped."

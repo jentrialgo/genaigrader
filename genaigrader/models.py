@@ -161,6 +161,24 @@ class Evaluation(models.Model):
         blank=True, null=True, help_text="Optional notes for the evaluation"
     )
 
+    status = models.CharField(
+        max_length=20,
+        choices=[
+            ("pending", "Pending"),
+            ("running", "Running"),
+            ("completed", "Completed"),
+            ("failed", "Failed"),
+        ],
+        default="pending",
+    )
+    total_questions = models.PositiveIntegerField(default=0)
+    failed_question_id = models.PositiveIntegerField(
+        null=True, blank=True, help_text="ID of the question that caused the failure"
+    )
+    failed_reason = models.TextField(
+        blank=True, null=True, help_text="Reason for evaluation failure"
+    )
+
     def __str__(self):
         return f"{self.prompt} {self.grade}"
 
@@ -172,6 +190,9 @@ class QuestionEvaluation(models.Model):
     question_option = models.ForeignKey(
         QuestionOption, on_delete=models.CASCADE, null=True, blank=True
     )
+    response_text = models.TextField(blank=True, default="")
+    is_correct = models.BooleanField(null=True, blank=True)
+    question_time = models.FloatField(default=0.0)
 
     def __str__(self):
         option_id = (

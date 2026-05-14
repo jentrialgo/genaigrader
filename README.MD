@@ -74,7 +74,7 @@ Before deploying to production, you **must** configure environment variables sec
 
 1.  **Initialize Production Stack with Environment Variables**:
     ```bash
-    docker compose --env-file .env -f Docker/docker-compose.prod.yml up -d --build
+    docker compose --env-file .env -f Docker/docker-compose.prod.yml up --build
     ```
     * This environment deploys a PostgreSQL 15-alpine database container.
     * The database utilizes a persistent volume for data integrity.
@@ -200,6 +200,57 @@ If running natively on the host machine:
 ```bash
 uv run python manage.py test
 ```
+
+---
+
+## ⚡ Background Task Queue (Django Q2)
+
+GenAI Grader uses **django-q2** to run LLM evaluations and model downloads as background tasks, keeping the web server responsive.
+
+The queue system uses the Django database as its broker (no Redis required). Tasks are enqueued by the web process and processed by a separate **`qcluster`** worker.
+
+### How the Queue Works by Environment
+
+| Environment | Database | Web server | Queue worker | How to start |
+|:------------|:---------|:-----------|:-------------|:-------------|
+| **Docker prod** | PostgreSQL | `gunicorn` (container `web`) | `qcluster` (container `worker`) | `docker compose -f Docker/docker-compose.prod.yml up` |
+| **Docker dev** | SQLite | `runserver` (container `web`) | `qcluster` (container `worker`) | `docker compose -f Docker/docker-compose.dev.yml up` |
+| **Scripts + ngrok** | SQLite (WAL mode) | `gunicorn` (tmux pane 1) | `qcluster` (tmux pane 2) | `./scripts/start_genaigrader.sh` |
+| **Plain runserver** | SQLite (WAL mode) | `runserver` (terminal 1) | `qcluster` (terminal 2) | `uv run manage.py runserver` + `uv run manage.py qcluster` |
+
+> **Important:** The queue worker (`qcluster`) **must** be running for tasks to execute. Without it, tasks stay in the queue forever. In Docker, the worker starts automatically. With `runserver` or scripts, you must start it or the scripts do it for you.
+
+### Q Cluster Configuration
+
+```python
+# mi_web/settings.py
+Q_CLUSTER = {
+    "name": "genaigrader",
+    "workers": 1,          # One worker — LLM workloads are GPU/CPU intensive
+    "timeout": 7200,       # 2 hours for long evaluations
+    "retry": 7300,         # Exceeds timeout to prevent double-execution
+    "queue_limit": 50,     # Max tasks in queue at once
+    "bulk": 10,            # Tasks dequeued per DB round-trip
+    "orm": "default",      # Database as broker (no Redis)
+    "ack_failures": True,  # Failed tasks are not retried
+    "recycle": 1000,       # Keep last 1000 Task records
+    "save_limit": 0,       # No pruning of Task records (default 250 would break progress bars)
+    "sync": False,         # Always False for real async queuing
+}
+```
+
+### Cleaning Stale Tasks
+
+If the database is recreated while tasks are queued, orphaned tasks may remain in the `django_q` tables. Clean them with:
+
+```bash
+uv run manage.py cleanup_stale_tasks --days 30          # delete Task records > 30 days
+uv run manage.py cleanup_stale_tasks --days 30 --dry-run  # preview only
+```
+
+### SQLite Considerations
+
+When using SQLite (development, scripts), the database runs in **WAL mode** (`PRAGMA journal_mode=WAL`) to allow the web server and the `qcluster` worker to access the database concurrently. Under heavy load, SQLite may show "database is locked" errors. For production use, PostgreSQL is recommended.
 
 ---
 

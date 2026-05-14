@@ -1,170 +1,279 @@
-import json
 import logging
 import time
+from typing import Optional, Tuple
 
-from django.db import transaction
+import ollama
+import openai
+from django.db import DatabaseError, transaction
 from django.utils import timezone
 
-from genaigrader.models import Evaluation, QuestionEvaluation, QuestionOption
+from genaigrader.llm_api import LlmApi
+from genaigrader.models import (
+    Evaluation,
+    Exam,
+    Model,
+    Question,
+    QuestionEvaluation,
+    QuestionOption,
+)
 from genaigrader.services.llm_service import generate_prompt
 from genaigrader.services.ollama_version_service import get_evaluation_ollama_version
 
-# Set logging level to INFO
-logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
-def stream_responses(questions, user_prompt, llm, total_questions, exam, notes=None):
+def create_evaluation_stub(
+    exam_id: int,
+    model_id: int,
+    user_prompt: str = "",
+    notes: Optional[str] = None,
+) -> Evaluation:
     """
-    Streams evaluation results for each question, yielding JSON-encoded progress updates.
+    Create an Evaluation stub in the database before enqueuing per-question tasks.
 
-    Parameters:
-    - questions: List of Question objects to be evaluated.
-    - user_prompt: Custom instruction provided by the user.
-    - llm: An instance of LlmApi, encapsulating model configuration and interaction.
-    - total_questions: Total number of questions to evaluate.
-    - exam: The Exam object associated with this evaluation.
-    - notes: Optional notes for the evaluation (e.g., exam difficulty, hardware used).
+    Parameters
+    ----------
+    exam_id : int
+        ID of the exam to evaluate.
+    model_id : int
+        ID of the model to use.
+    user_prompt : str, optional
+        Optional custom user prompt text.
+    notes : str, optional
+        Optional notes for the evaluation.
 
-    Yields:
-    - str: Server-sent event JSON containing progress and evaluation details.
+    Returns
+    -------
+    Evaluation
+        The newly created Evaluation instance with status='pending'.
+
+    Raises
+    ------
+    ValueError
+        If the exam has no questions.
     """
-    correct_count = 0
-    total_evaluation_time = 0.0
-    question_evaluations = []  # Store question evaluations temporarily
+    exam = Exam.objects.get(id=exam_id)
+    model = Model.objects.get(id=model_id)
 
-    evaluation = Evaluation(
-        prompt=(
-            (f"{user_prompt}\n\n" if user_prompt else "")
-            + "Te voy a pasar una pregunta de test y tienes que responderme con qué opción es la correcta. "
-            "Sólo debes decirme la opción, por ejemplo 'a', absolutamente nada más.\n"
-        ),
+    total_questions = exam.question_set.count()
+    if total_questions == 0:
+        raise ValueError(f"Exam {exam} has no questions")
+
+    prompt = (
+        (f"{user_prompt}\n\n" if user_prompt else "")
+        + "Te voy a pasar una pregunta de test y tienes que responderme con qué opción es la correcta. "
+        "Sólo debes decirme la opción, por ejemplo 'a', absolutamente nada más.\n"
+    )
+
+    evaluation = Evaluation.objects.create(
+        prompt=prompt,
         ev_date=timezone.now(),
         grade=0,
-        model=llm.model_obj,
+        time=0,
+        model=model,
         exam=exam,
-        time=0.0,
-        ollama_version=get_evaluation_ollama_version(llm.model_obj),
+        ollama_version=get_evaluation_ollama_version(model),
         notes=notes,
+        status="pending",
+        total_questions=total_questions,
     )
-    for index, question in enumerate(questions):
-        start_time = time.monotonic()
+    logger.info(
+        "Created evaluation stub id=%s for exam=%s model=%s questions=%s",
+        evaluation.id,
+        exam_id,
+        model_id,
+        total_questions,
+    )
+    return evaluation
 
-        try:
-            progress = process_question(
-                correct_count,
-                index,
-                question,
-                user_prompt,
-                llm,
-                total_questions,
-                evaluation,
-                question_evaluations,
-            )
-        except Exception as e:
-            logging.error(f"Error processing question {index + 1}: {e}")
-            error_json = {
-                "error": str(e),
-                "processed_questions": index + 1,
-                "total_questions": total_questions,
-                "correct_count": correct_count,
-            }
-            yield f"data: {json.dumps(error_json)}\n\n"
-            return  # Terminate the evaluation if an error occurs
 
-        end_time = time.monotonic()
-        question_time = end_time - start_time
-        total_evaluation_time += question_time
+def compute_evaluation_summary(evaluation: Evaluation) -> Tuple[float, float]:
+    """
+    Compute the final grade and wall-clock time for a completed evaluation.
 
-        correct_count = progress["correct_count"]
-        progress["time"] = round(question_time, 2)
+    Parameters
+    ----------
+    evaluation : Evaluation
+        The evaluation to summarize.
 
-        if index == len(questions) - 1:
-            progress["total_time"] = round(total_evaluation_time, 2)
+    Returns
+    -------
+    tuple[float, float]
+        (grade, time) where grade is 0-10 and time is seconds.
+    """
+    question_evals = QuestionEvaluation.objects.filter(evaluation=evaluation)
+    total_questions = question_evals.count()
 
-        yield f"data: {json.dumps(progress)}\n\n"
+    if total_questions == 0:
+        return 0.0, 0.0
 
-    # All questions processed successfully, now save everything in a transaction
-    with transaction.atomic():
-        evaluation.grade = (
-            round((correct_count / total_questions * 10), 2)
-            if total_questions > 0
-            else 0.0
+    correct_count = question_evals.filter(is_correct=True).count()
+
+    grade = round((correct_count / total_questions) * 10, 2)
+    total_time = round(sum(qe.question_time for qe in question_evals), 2)
+
+    return grade, total_time
+
+
+def evaluate_single_question(
+    evaluation_id: int,
+    question_id: int,
+    user_prompt: str = "",
+) -> dict:
+    """
+    Evaluate a single question against the LLM and create a QuestionEvaluation.
+
+    If this is the last question to complete the evaluation, the final grade
+    and time are computed and the Evaluation is marked 'completed'.
+
+    If the LLM call fails, the Evaluation is marked 'failed' with the
+    question ID and error reason, and the original exception is re-raised.
+
+    Parameters
+    ----------
+    evaluation_id : int
+        ID of the parent Evaluation stub.
+    question_id : int
+        ID of the Question to evaluate.
+    user_prompt : str, optional
+        Optional custom prompt text.
+
+    Returns
+    -------
+    dict
+        Result dictionary with keys:
+        - evaluation_id (int)
+        - question_id (int)
+        - response (str)
+        - is_correct (bool)
+        - question_time (float)
+        - evaluation_complete (bool)
+        - grade (float | None)
+        - total_time (float | None)
+    """
+    evaluation = Evaluation.objects.select_related("exam", "model").get(
+        id=evaluation_id
+    )
+
+    # Only transition from pending -> running. Do not overwrite terminal states.
+    updated = Evaluation.objects.filter(id=evaluation_id, status="pending").update(
+        status="running"
+    )
+    if updated == 0:
+        logger.warning(
+            "Evaluation %s is not pending; skipping status update.", evaluation_id
         )
-        evaluation.time = round(total_evaluation_time, 2)
-        evaluation.save()
 
-        for q_eval in question_evaluations:
-            q_eval.evaluation = evaluation
-            q_eval.save()
+    question = Question.objects.prefetch_related("questionoption_set").get(
+        id=question_id
+    )
+    model = evaluation.model
 
-
-def process_question(
-    correct_count,
-    index,
-    question,
-    user_prompt,
-    llm,
-    total_questions,
-    evaluation,
-    question_evaluations,
-):
-    """
-    Processes a single question using the provided LlmApi instance and updates evaluation state.
-
-    Parameters:
-    - correct_count: Number of correct answers so far.
-    - index: Index of the current question.
-    - question: The Question object to be evaluated.
-    - user_prompt: Instructional prefix to influence model behavior.
-    - llm: An instance of LlmApi to generate the model response.
-    - total_questions: Total number of questions in the session.
-    - evaluation: The Evaluation database object to associate with results.
-    - question_evaluations: List to store question evaluations temporarily.
-
-    Returns:
-    - dict: A dictionary containing processed question data and result.
-    """
+    llm = LlmApi(model)
     prompt_data = generate_prompt(question, user_prompt)
-    logging.info(f"Question prompt: {prompt_data['prompt']}")
-    llm_response_list = list(llm.generate_response(prompt_data["prompt"]))
-    logging.info(f"LLM response: {''.join(llm_response_list)}\n")
+    logger.info(
+        "Evaluating question %s for evaluation %s",
+        question_id,
+        evaluation_id,
+    )
+
+    start_time = time.monotonic()
+    try:
+        llm_response_list = list(llm.generate_response(prompt_data["prompt"]))
+    except (
+        RuntimeError,
+        ConnectionError,
+        TimeoutError,
+        ValueError,
+        openai.OpenAIError,
+        ollama.ResponseError,
+    ) as exc:
+        logger.exception(
+            "LLM error on question %s evaluation %s: %s",
+            question_id,
+            evaluation_id,
+            exc,
+        )
+        try:
+            Evaluation.objects.filter(id=evaluation_id, status="running").update(
+                status="failed",
+                failed_question_id=question_id,
+                failed_reason=str(exc),
+            )
+        except DatabaseError:
+            logger.exception(
+                "Failed to persist failure state for evaluation %s", evaluation_id
+            )
+        raise exc
+
+    end_time = time.monotonic()
+    question_time = end_time - start_time
 
     if not llm_response_list:
-        # An example of a case where the LLM doesn't return any response
-        # is qwen3.06b: it get's stuck in an infinite loop in the thiking
-        # phase and, in the end, it doesn't generate the "</thinking>" tag
-        # and, therefore, it doesn't return any response.
         response = ""
     else:
         first_token = llm_response_list[0].strip().lower()
         response = first_token[0] if first_token else ""
 
-    is_correct = response == question.correct_option.content.strip().lower()[0]
-
+    is_correct = False
     selected_option = None
     if response:
         selected_option = QuestionOption.objects.filter(
             question=question, content__istartswith=response
         ).first()
+        is_correct = response == question.correct_option.content.strip().lower()[0]
 
-    question_eval = QuestionEvaluation(
-        question=question, question_option=selected_option
-    )
-    question_evaluations.append(question_eval)
+    # Atomically create/update the question evaluation and check for completion.
+    evaluation_complete = False
+    grade: Optional[float] = None
+    total_time: Optional[float] = None
 
-    if is_correct:
-        correct_count += 1
+    with transaction.atomic():
+        eval_locked = Evaluation.objects.select_for_update().get(id=evaluation_id)
+
+        # Prevent duplicate evaluations for the same question.
+        qe, created = QuestionEvaluation.objects.get_or_create(
+            evaluation=eval_locked,
+            question=question,
+            defaults={
+                "question_option": selected_option,
+                "response_text": response,
+                "is_correct": is_correct,
+                "question_time": round(question_time, 2),
+            },
+        )
+        if not created:
+            logger.warning(
+                "Duplicate question evaluation detected for eval=%s question=%s; keeping existing.",
+                evaluation_id,
+                question_id,
+            )
+
+        completed = QuestionEvaluation.objects.filter(evaluation=eval_locked).count()
+        if completed >= eval_locked.total_questions and eval_locked.status not in (
+            "completed",
+            "failed",
+        ):
+            grade, total_time = compute_evaluation_summary(eval_locked)
+            eval_locked.grade = grade
+            eval_locked.time = total_time
+            eval_locked.status = "completed"
+            eval_locked.save()
+            evaluation_complete = True
+            logger.info(
+                "Evaluation %s completed: grade=%s time=%ss",
+                evaluation_id,
+                grade,
+                total_time,
+            )
 
     return {
-        "processed_questions": index + 1,
-        "total_questions": total_questions,
-        "correct_count": correct_count,
-        "response": {
-            "question_prompt": prompt_data["question_prompt"],
-            "user_prompt": prompt_data["user_prompt"],
-            "prompt": prompt_data["prompt"],
-            "response": response,
-            "correct_option": question.correct_option.content,
-            "is_correct": is_correct,
-        },
+        "evaluation_id": evaluation_id,
+        "question_id": question_id,
+        "response": response,
+        "is_correct": is_correct,
+        "question_time": round(question_time, 2),
+        "evaluation_complete": evaluation_complete,
+        "grade": grade,
+        "total_time": total_time,
     }

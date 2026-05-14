@@ -37,12 +37,18 @@ from genaigrader.views.course_views import (
     update_exam,
 )
 from genaigrader.views.evaluate_views import evaluate_view, upload_file
+from genaigrader.views.evaluation_views import (
+    batch_evaluation_status,
+    evaluation_questions,
+    evaluation_status,
+)
 from genaigrader.views.exam_details_view import (
     delete_evaluation,
     exam_detail,
     question_analytics,
 )
 from genaigrader.views.home_view import home_view
+from genaigrader.views.task_views import batch_task_status, task_status
 from genaigrader.views.user_settings_view import UserSettingsView
 
 urlpatterns = [
@@ -61,6 +67,21 @@ urlpatterns = [
     path("analysis/", analysis_view, name="analysis"),
     path("api/", api_view, name="api"),
     path("batch-evaluations/", batch_evaluations_view, name="batch_evaluations"),
+    path(
+        "evaluation/<int:eval_id>/status/",
+        evaluation_status,
+        name="evaluation_status",
+    ),
+    path(
+        "evaluation/<int:eval_id>/questions/",
+        evaluation_questions,
+        name="evaluation_questions",
+    ),
+    path(
+        "batch-evaluation-status/",
+        batch_evaluation_status,
+        name="batch_evaluation_status",
+    ),
     path("export/all/", export_all_evaluations, name="export_all_evaluations"),
     path(
         "export/course/<int:course_id>/",
@@ -78,5 +99,7 @@ urlpatterns = [
     path("model/delete/<int:model_id>/", delete_model, name="delete_model"),
     path("model/create/", create_model, name="create_model"),
     path("model/pull/", pull_model, name="pull_model"),
+    path("task/<str:task_id>/", task_status, name="task_status"),
+    path("batch-task-status/", batch_task_status, name="batch_task_status"),
     path("", home_view, name="home"),
 ]
