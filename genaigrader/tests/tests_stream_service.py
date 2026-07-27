@@ -291,6 +291,60 @@ class EvaluateSingleQuestionTest(TestCase):
         )
 
     @patch("genaigrader.services.stream_service.generate_prompt")
+    def test_evaluate_single_question_generic_exception_marks_failed(
+        self, mock_generate_prompt
+    ):
+        mock_generate_prompt.return_value = {
+            "question_prompt": "What is 0+0?",
+            "user_prompt": "Test prompt",
+            "prompt": "Full test prompt",
+        }
+
+        class ReadTimeout(Exception):
+            pass
+
+        mock_llm = Mock()
+        mock_llm.model_obj = self.model
+        mock_llm.generate_response.side_effect = ReadTimeout("timed out after 300s")
+
+        with patch("genaigrader.services.stream_service.LlmApi", return_value=mock_llm):
+            with self.assertRaises(ReadTimeout):
+                evaluate_single_question(
+                    self.evaluation.id, self.question.id, "Test prompt"
+                )
+
+        self.evaluation.refresh_from_db()
+        self.assertEqual(self.evaluation.status, "failed")
+        self.assertEqual(self.evaluation.failed_question_id, self.question.id)
+        self.assertIn("ReadTimeout", self.evaluation.failed_reason)
+        self.assertIn("timed out after 300s", self.evaluation.failed_reason)
+
+    @patch("genaigrader.services.stream_service.generate_prompt")
+    def test_evaluate_single_question_failed_reason_truncated(
+        self, mock_generate_prompt
+    ):
+        mock_generate_prompt.return_value = {
+            "question_prompt": "What is 0+0?",
+            "user_prompt": "Test prompt",
+            "prompt": "Full test prompt",
+        }
+
+        long_message = "x" * 1000
+        mock_llm = Mock()
+        mock_llm.model_obj = self.model
+        mock_llm.generate_response.side_effect = RuntimeError(long_message)
+
+        with patch("genaigrader.services.stream_service.LlmApi", return_value=mock_llm):
+            with self.assertRaises(RuntimeError):
+                evaluate_single_question(
+                    self.evaluation.id, self.question.id, "Test prompt"
+                )
+
+        self.evaluation.refresh_from_db()
+        self.assertEqual(self.evaluation.status, "failed")
+        self.assertLessEqual(len(self.evaluation.failed_reason), 500)
+
+    @patch("genaigrader.services.stream_service.generate_prompt")
     def test_evaluate_single_question_does_not_aggregate_when_not_last(
         self, mock_generate_prompt
     ):

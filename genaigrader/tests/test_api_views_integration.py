@@ -204,3 +204,51 @@ class BatchEvaluationsViewTest(TestCase):
         client = Client()
         response = client.get("/batch-evaluations/")
         self.assertEqual(response.status_code, 302)
+
+    @patch("genaigrader.services.ollama_version_service.get_ollama_version")
+    @patch("genaigrader.views.batch_evaluations_view.async_task")
+    def test_batch_evaluation_ordered_by_model(
+        self, mock_async_task, mock_ollama_version
+    ):
+        """Tasks must be enqueued grouped by model (model → exam → rep)."""
+        exam2 = Exam.objects.create(
+            course=self.course, description="Test Exam 2", user=self.user
+        )
+        q2 = Question.objects.create(statement="Q2?", exam=exam2)
+        QuestionOption.objects.create(content="a) x", question=q2)
+        opt_b2 = QuestionOption.objects.create(content="b) y", question=q2)
+        q2.correct_option = opt_b2
+        q2.save()
+
+        model2 = Model.objects.create(description="Test Model 2")
+
+        mock_async_task.side_effect = [f"fake-task-id-{i}" for i in range(4)]
+        mock_ollama_version.return_value = None
+
+        response = self.client.post(
+            "/batch-evaluations/",
+            data=json.dumps(
+                {
+                    "exams[]": [str(self.exam.id), str(exam2.id)],
+                    "models[]": [str(self.model.id), str(model2.id)],
+                    "repetitions": 1,
+                    "user_prompt": "",
+                    "notes": "",
+                }
+            ),
+            content_type="application/json",
+        )
+
+        data = response.json()
+        self.assertEqual(data["total_tasks"], 4)
+
+        model_ids_in_order = [meta["model_id"] for meta in data["evaluations"]]
+        seen_models = []
+        for mid in model_ids_in_order:
+            if not seen_models or seen_models[-1] != mid:
+                seen_models.append(mid)
+        self.assertEqual(
+            len(seen_models),
+            len(set(model_ids_in_order)),
+            "Evaluations for the same model must be contiguous",
+        )

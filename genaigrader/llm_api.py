@@ -1,4 +1,5 @@
 import ipaddress
+import logging
 import socket
 from urllib.parse import urlparse
 
@@ -7,9 +8,15 @@ import openai
 from django.core.exceptions import ValidationError
 from django.core.validators import URLValidator
 
+logger = logging.getLogger(__name__)
+
 # Process-level cache of validated model IDs so connectivity checks
 # (e.g. ``models.list()``) are only performed once per model in a worker.
 _validated_model_ids: set = set()
+
+# Process-level tracking of the last local model loaded in Ollama.
+# Used to release VRAM when switching between local models.
+_last_local_model_name: str | None = None
 
 
 def is_private_url(url):
@@ -43,6 +50,24 @@ def is_private_url(url):
         return False
     except (ValueError, TypeError):
         return True
+
+
+def _unload_local_model(client, model_name: str) -> None:
+    """Best-effort release of VRAM for a previously loaded Ollama model.
+
+    Sends a ``keep_alive=0`` request so Ollama unloads the model from GPU
+    memory. Errors are logged but never propagated: a failed unload must not
+    break the evaluation pipeline.
+    """
+    try:
+        client.generate(model=model_name, prompt="", keep_alive=0)
+        logger.info("Unloaded local model %s from Ollama VRAM", model_name)
+    except Exception:
+        logger.warning(
+            "Failed to unload local model %s from Ollama (best-effort)",
+            model_name,
+            exc_info=True,
+        )
 
 
 class LlmApi:
@@ -229,6 +254,10 @@ class LlmApi:
         """
         Calls a local Ollama model to generate a response to the prompt.
 
+        Before loading a new model, unloads the previously loaded local model
+        (if different) to release VRAM and avoid GPU/CPU offload caused by
+        multiple models competing for limited GPU memory.
+
         Parameters:
         - prompt (str): The user input to be sent to the local model.
 
@@ -238,10 +267,22 @@ class LlmApi:
         Raises:
         - ValueError: If an error occurs during local model execution.
         """
+        global _last_local_model_name
+
         if self.ollama_client is None:
             self.ollama_client = ollama.Client(timeout=300)
+
+        current_model = self.model_obj.description
+        if (
+            _last_local_model_name is not None
+            and _last_local_model_name != current_model
+        ):
+            _unload_local_model(self.ollama_client, _last_local_model_name)
+
+        _last_local_model_name = current_model
+
         response_stream = self.ollama_client.chat(
-            model=self.model_obj.description,
+            model=current_model,
             messages=[{"role": "user", "content": prompt}],
             stream=True,
         )

@@ -73,7 +73,10 @@ function pollEvaluationQuestions(evalId, meta) {
       .then(function(r) {
         var ct = r.headers.get("content-type") || "";
         if (!r.ok || r.redirected || ct.indexOf("application/json") === -1) {
-          clearInterval(interval);
+          state.retries++;
+          if (state.retries >= MAX_RETRIES) {
+            clearInterval(interval);
+          }
           return null;
         }
         return r.json();
@@ -151,6 +154,8 @@ function pollEvaluations(evaluationIds, metaById, onProgress, onAllComplete) {
   var csrf = getCookie("csrftoken");
   var rendered = {};
   var retries = 0;
+  var lastFinished = 0;
+  var lastTotal = 0;
   var interval = setInterval(function() {
     fetch("/batch-evaluation-status/", {
       method: "POST",
@@ -163,7 +168,16 @@ function pollEvaluations(evaluationIds, metaById, onProgress, onAllComplete) {
       .then(function(r) {
         var ct = r.headers.get("content-type") || "";
         if (!r.ok || r.redirected || ct.indexOf("application/json") === -1) {
-          clearInterval(interval);
+          retries++;
+          $("#batch-eval-status-msg").html(
+            '<div class="batch-eval-status-warning">Connection problem (retry ' + retries + '/' + MAX_RETRIES + '). Waiting for server...</div>'
+          );
+          if (retries >= MAX_RETRIES) {
+            clearInterval(interval);
+            $("#batch-eval-status-msg").html(
+              '<div class="batch-eval-status-error">Stopped updating progress after ' + MAX_RETRIES + ' failed attempts. Reload the page to resume. Last progress: ' + lastFinished + '/' + lastTotal + '</div>'
+            );
+          }
           return null;
         }
         return r.json();
@@ -175,6 +189,7 @@ function pollEvaluations(evaluationIds, metaById, onProgress, onAllComplete) {
           return;
         }
         retries = 0;
+        $("#batch-eval-status-msg").html("");
         var allDone = true;
         var finishedQuestions = 0;
         var totalQuestions = 0;
@@ -202,6 +217,8 @@ function pollEvaluations(evaluationIds, metaById, onProgress, onAllComplete) {
             allDone = false;
           }
         }
+        lastFinished = finishedQuestions;
+        lastTotal = totalQuestions;
         if (onProgress) {
           onProgress(finishedQuestions, totalQuestions);
         }
@@ -212,8 +229,14 @@ function pollEvaluations(evaluationIds, metaById, onProgress, onAllComplete) {
       })
       .catch(function() {
         retries++;
+        $("#batch-eval-status-msg").html(
+          '<div class="batch-eval-status-warning">Connection problem (retry ' + retries + '/' + MAX_RETRIES + '). Waiting for server...</div>'
+        );
         if (retries >= MAX_RETRIES) {
           clearInterval(interval);
+          $("#batch-eval-status-msg").html(
+            '<div class="batch-eval-status-error">Stopped updating progress after ' + MAX_RETRIES + ' failed attempts. Reload the page to resume. Last progress: ' + lastFinished + '/' + lastTotal + '</div>'
+          );
         }
       });
   }, 3000);
@@ -307,6 +330,7 @@ $(document).ready(function () {
     $("#loading-indicator").show();
     $("#progress-bar").css("width", "0%").text("0%");
     $("#batch-eval-results").html("");
+    $("#batch-eval-status-msg").html("");
     $("#batch-eval-errors").html("");
     $("#exam-details").html("");
     $("#batch-eval-table tbody").html("");
