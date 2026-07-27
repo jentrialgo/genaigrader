@@ -68,7 +68,25 @@ def evaluate_question_task(evaluation_id, question_id, user_prompt=""):
         evaluation_id,
         question_id,
     )
-    result = evaluate_single_question(evaluation_id, question_id, user_prompt)
+    try:
+        result = evaluate_single_question(evaluation_id, question_id, user_prompt)
+    except Exception as exc:
+        if isinstance(exc, (KeyboardInterrupt, SystemExit)):
+            raise
+        logger.exception(
+            "Task-level failure: eval=%s question=%s error_type=%s",
+            evaluation_id,
+            question_id,
+            type(exc).__name__,
+        )
+        Evaluation.objects.filter(
+            id=evaluation_id, status__in=("pending", "running")
+        ).update(
+            status="failed",
+            failed_question_id=question_id,
+            failed_reason=f"Task error ({type(exc).__name__}): {exc}"[:500],
+        )
+        raise
     logger.info(
         "Completed question evaluation task: eval=%s question=%s complete=%s",
         evaluation_id,

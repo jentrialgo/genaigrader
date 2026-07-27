@@ -1,12 +1,17 @@
 from unittest.mock import Mock, patch
 
+from django.contrib.auth import get_user_model
 from django.test import TestCase
+from django.utils import timezone
 
+from genaigrader.models import Course, Evaluation, Exam, Model, Question, QuestionOption
 from genaigrader.tasks import (
     download_model_task,
     evaluate_exam_task,
     evaluate_question_task,
 )
+
+User = get_user_model()
 
 
 def _mock_evaluation_exists():
@@ -142,3 +147,81 @@ class EvaluateExamTaskTest(TestCase):
             evaluation_id=5, exam_id=1, model_id=2, user_prompt="test"
         )
         self.assertEqual(result["status"], "discarded")
+
+
+class EvaluateQuestionTaskFailSafeTest(TestCase):
+    """Tests for the task-level fail-safe that marks evaluations as failed
+    when the service layer raises without updating the DB status."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="testuser", email="testuser@example.com", password="password"
+        )
+        self.course = Course.objects.create(name="Test Course", user=self.user)
+        self.model = Model.objects.create(description="Test Model")
+        self.exam = Exam.objects.create(
+            course=self.course, description="Test Exam", user=self.user
+        )
+        self.question = Question.objects.create(
+            statement="What is 2+2?", exam=self.exam
+        )
+        QuestionOption.objects.create(content="a) 3", question=self.question)
+        option_b = QuestionOption.objects.create(content="b) 4", question=self.question)
+        self.question.correct_option = option_b
+        self.question.save()
+        self.evaluation = Evaluation.objects.create(
+            prompt="test",
+            ev_date=timezone.now(),
+            grade=0,
+            time=0,
+            model=self.model,
+            exam=self.exam,
+            status="pending",
+            total_questions=1,
+        )
+
+    @patch("genaigrader.tasks.evaluate_single_question")
+    def test_failsafe_marks_failed_when_service_raises(self, mock_evaluate):
+        """If the service raises without marking failed, the task does it."""
+        mock_evaluate.side_effect = RuntimeError("unexpected crash")
+
+        with self.assertRaises(RuntimeError):
+            evaluate_question_task(self.evaluation.id, self.question.id)
+
+        self.evaluation.refresh_from_db()
+        self.assertEqual(self.evaluation.status, "failed")
+        self.assertEqual(self.evaluation.failed_question_id, self.question.id)
+        self.assertIn("Task error", self.evaluation.failed_reason)
+        self.assertIn("unexpected crash", self.evaluation.failed_reason)
+
+    @patch("genaigrader.tasks.evaluate_single_question")
+    def test_failsafe_does_not_overwrite_completed(self, mock_evaluate):
+        """If the evaluation is already completed, the task discards it early."""
+        self.evaluation.status = "completed"
+        self.evaluation.save()
+
+        mock_evaluate.side_effect = RuntimeError("late error")
+
+        result = evaluate_question_task(self.evaluation.id, self.question.id)
+
+        self.assertEqual(result["status"], "discarded")
+        mock_evaluate.assert_not_called()
+        self.evaluation.refresh_from_db()
+        self.assertEqual(self.evaluation.status, "completed")
+
+    @patch("genaigrader.tasks.evaluate_single_question")
+    def test_failsafe_does_not_overwrite_already_failed(self, mock_evaluate):
+        """If the evaluation is already failed, the task discards it early."""
+        self.evaluation.status = "failed"
+        self.evaluation.failed_reason = "Service already set this"
+        self.evaluation.save()
+
+        mock_evaluate.side_effect = RuntimeError("late error")
+
+        result = evaluate_question_task(self.evaluation.id, self.question.id)
+
+        self.assertEqual(result["status"], "discarded")
+        mock_evaluate.assert_not_called()
+        self.evaluation.refresh_from_db()
+        self.assertEqual(self.evaluation.status, "failed")
+        self.assertEqual(self.evaluation.failed_reason, "Service already set this")

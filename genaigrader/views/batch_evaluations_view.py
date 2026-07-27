@@ -85,8 +85,15 @@ def handle_batch_evaluations_post(request, user, exams, models):
     evaluations_meta = []
     rep_counter = {}
 
-    for exam_id in exam_ids:
-        for model_id in model_ids:
+    logger.info(
+        "Enqueuing batch: %d model(s) x %d exam(s) x %d rep(s), ordered by model",
+        len(model_ids),
+        len(exam_ids),
+        repetitions,
+    )
+
+    for model_id in model_ids:
+        for exam_id in exam_ids:
             for rep in range(1, repetitions + 1):
                 eval_stub = create_evaluation_stub(
                     exam_id, model_id, user_prompt, notes

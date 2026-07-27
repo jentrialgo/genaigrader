@@ -2,8 +2,6 @@ import logging
 import time
 from typing import Optional, Tuple
 
-import ollama
-import openai
 from django.db import DatabaseError, transaction
 from django.utils import timezone
 
@@ -20,6 +18,27 @@ from genaigrader.services.llm_service import generate_prompt
 from genaigrader.services.ollama_version_service import get_evaluation_ollama_version
 
 logger = logging.getLogger(__name__)
+
+_MAX_FAILED_REASON_LEN = 500
+
+
+def _mark_evaluation_failed(evaluation_id: int, question_id: int, reason: str) -> None:
+    """Persist a failure state on the Evaluation.
+
+    Only transitions from ``running`` so it never overwrites a terminal
+    ``completed`` or already-``failed`` status set by another task.
+    """
+    truncated = reason[:_MAX_FAILED_REASON_LEN]
+    try:
+        Evaluation.objects.filter(id=evaluation_id, status="running").update(
+            status="failed",
+            failed_question_id=question_id,
+            failed_reason=truncated,
+        )
+    except DatabaseError:
+        logger.exception(
+            "Failed to persist failure state for evaluation %s", evaluation_id
+        )
 
 
 def create_evaluation_stub(
@@ -172,39 +191,33 @@ def evaluate_single_question(
     llm = LlmApi(model)
     prompt_data = generate_prompt(question, user_prompt)
     logger.info(
-        "Evaluating question %s for evaluation %s",
+        "Evaluating question %s for evaluation %s model=%s",
         question_id,
         evaluation_id,
+        model.description,
     )
 
     start_time = time.monotonic()
     try:
         llm_response_list = list(llm.generate_response(prompt_data["prompt"]))
-    except (
-        RuntimeError,
-        ConnectionError,
-        TimeoutError,
-        ValueError,
-        openai.OpenAIError,
-        ollama.ResponseError,
-    ) as exc:
+    except Exception as exc:
+        if isinstance(exc, (KeyboardInterrupt, SystemExit)):
+            raise
+        exc_type = type(exc).__name__
         logger.exception(
-            "LLM error on question %s evaluation %s: %s",
+            "LLM error on question %s evaluation %s model=%s error_type=%s: %s",
             question_id,
             evaluation_id,
+            model.description,
+            exc_type,
             exc,
         )
-        try:
-            Evaluation.objects.filter(id=evaluation_id, status="running").update(
-                status="failed",
-                failed_question_id=question_id,
-                failed_reason=str(exc),
-            )
-        except DatabaseError:
-            logger.exception(
-                "Failed to persist failure state for evaluation %s", evaluation_id
-            )
-        raise exc
+        _mark_evaluation_failed(
+            evaluation_id,
+            question_id,
+            f"LLM error ({exc_type}): {exc}",
+        )
+        raise
 
     end_time = time.monotonic()
     question_time = end_time - start_time
