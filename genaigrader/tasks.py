@@ -7,6 +7,9 @@ for serialization by the django-q2 broker.
 """
 
 import logging
+from typing import Dict, List
+
+from django_q.tasks import async_task
 
 from genaigrader.models import Evaluation
 from genaigrader.services.model_service import pull_model
@@ -15,6 +18,67 @@ from genaigrader.services.stream_service import evaluate_single_question
 logger = logging.getLogger(__name__)
 
 EVALUATION_TASK_TIMEOUT = 3600
+
+
+def batch_orchestrator_task(
+    evaluations_meta: List[Dict],
+    exam_questions_map: Dict[int, List[int]],
+    user_prompt: str = "",
+) -> dict:
+    """Background orchestrator: enqueue per-question tasks for a batch of stubs.
+
+    The stubs are already created by the view; this task only enqueues the
+    individual ``evaluate_question_task`` workers so the HTTP response returns
+    quickly instead of blocking for the entire enqueue loop.
+
+    Parameters
+    ----------
+    evaluations_meta : list[dict]
+        Each dict has ``id`` (eval stub PK), ``exam_id``, ``model_id``, etc.
+    exam_questions_map : dict[int, list[int]]
+        Mapping of exam_id → list of question IDs.
+    user_prompt : str
+        Optional custom prompt text.
+    """
+    logger.info(
+        "Orchestrator started: %s evaluations across %s exams",
+        len(evaluations_meta),
+        len(exam_questions_map),
+    )
+    eval_ids = [m["id"] for m in evaluations_meta]
+    task_count = 0
+    try:
+        for meta in evaluations_meta:
+            eval_id = meta["id"]
+            exam_id = meta["exam_id"]
+            for question_id in exam_questions_map.get(exam_id, []):
+                async_task(
+                    evaluate_question_task,
+                    eval_id,
+                    question_id,
+                    user_prompt,
+                    group=f"eval:{eval_id}",
+                    timeout=EVALUATION_TASK_TIMEOUT,
+                )
+                task_count += 1
+    except Exception:
+        logger.exception(
+            "Orchestrator failed after %s tasks; marking remaining stubs as failed",
+            task_count,
+        )
+        Evaluation.objects.filter(
+            id__in=eval_ids, status__in=("pending", "running")
+        ).update(
+            status="failed",
+            failed_reason="Batch orchestrator failure",
+        )
+        raise
+
+    logger.info(
+        "Orchestrator finished: %s question task(s) enqueued",
+        task_count,
+    )
+    return {"status": "ok", "task_count": task_count}
 
 
 def evaluate_question_task(evaluation_id, question_id, user_prompt=""):
@@ -130,3 +194,26 @@ def evaluate_exam_task(*args, **kwargs):
         "Discarding stale evaluate_exam_task: args=%s kwargs=%s", args, kwargs
     )
     return {"status": "discarded", "reason": "obsolete task name"}
+
+
+def cleanup_stale_tasks_task(days=3):  # purge every 72h
+    """
+    Scheduled task: clean orphaned OrmQ entries, old Task records,
+    and reap stale Evaluations stuck in pending/running.
+
+    Parameters
+    ----------
+    days : int
+        Delete Task records older than this many days.
+
+    Returns
+    -------
+    dict
+        Summary of what was cleaned and reaped.
+    """
+    from django.core.management import call_command
+
+    logger.info("Running scheduled cleanup: days=%s", days)
+    call_command("cleanup_stale_tasks", days=days)
+    logger.info("Scheduled cleanup finished: days=%s", days)
+    return {"status": "ok", "days": days}

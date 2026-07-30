@@ -11,7 +11,7 @@ from django_q.tasks import async_task
 from genaigrader.models import Course, Exam, Question
 from genaigrader.services.get_models_service import get_models_for_user
 from genaigrader.services.stream_service import create_evaluation_stub
-from genaigrader.tasks import EVALUATION_TASK_TIMEOUT, evaluate_question_task
+from genaigrader.tasks import EVALUATION_TASK_TIMEOUT, batch_orchestrator_task
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +80,6 @@ def handle_batch_evaluations_post(request, user, exams, models):
 
     exam_questions_map = _prefetch_exam_question_ids(exams_to_eval)
 
-    task_ids = []
     evaluation_ids = []
     evaluations_meta = []
     rep_counter = {}
@@ -92,6 +91,7 @@ def handle_batch_evaluations_post(request, user, exams, models):
         repetitions,
     )
 
+    # Phase 1: create all stubs synchronously (fast – pure DB writes)
     for model_id in model_ids:
         for exam_id in exam_ids:
             for rep in range(1, repetitions + 1):
@@ -113,27 +113,55 @@ def handle_batch_evaluations_post(request, user, exams, models):
                         "total_repetitions": repetitions,
                     }
                 )
-                for question_id in exam_questions_map.get(exam_id, []):
-                    task_id = async_task(
-                        evaluate_question_task,
-                        eval_stub.id,
-                        question_id,
-                        user_prompt,
-                        group=f"eval:{eval_stub.id}",
-                        timeout=EVALUATION_TASK_TIMEOUT,
-                    )
-                    task_ids.append(task_id)
 
-    total_tasks = len(task_ids)
+    # Phase 2: enqueue ONE orchestrator task that will create per-question tasks
+    total_questions = (
+        sum(len(exam_questions_map.get(eid, [])) for eid in exam_ids)
+        * len(model_ids)
+        * repetitions
+    )
+
+    try:
+        async_task(
+            batch_orchestrator_task,
+            evaluations_meta,
+            exam_questions_map,
+            user_prompt,
+            timeout=EVALUATION_TASK_TIMEOUT,
+            group="batch:orchestrator",
+        )
+    except Exception:
+        from genaigrader.models import Evaluation
+
+        Evaluation.objects.filter(
+            id__in=evaluation_ids, status__in=("pending", "running")
+        ).update(
+            status="failed",
+            failed_reason="Orchestrator enqueue failed",
+        )
+        logger.exception(
+            "Failed to enqueue orchestrator for evaluations: %s", evaluation_ids
+        )
+        raise
+
+    logger.info(
+        "Batch %s model(s) x %s exam(s) x %s rep(s): %s stub(s) created, "
+        "orchestrator enqueued for %s question(s)",
+        len(model_ids),
+        len(exam_ids),
+        repetitions,
+        len(evaluation_ids),
+        total_questions,
+    )
 
     return JsonResponse(
         {
             "status": "queued",
-            "task_ids": task_ids,
+            "task_ids": [],
             "evaluation_ids": evaluation_ids,
             "evaluations": evaluations_meta,
-            "total_tasks": total_tasks,
-            "message": f"Batch evaluation queued: {total_tasks} question task(s)",
+            "total_tasks": total_questions,
+            "message": f"Batch evaluation queued: {total_questions} question task(s) (enqueuing in background)",
         }
     )
 

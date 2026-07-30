@@ -123,16 +123,33 @@ def handle_file_upload(request):
                 exam.id, llm.model_obj.id, user_prompt, notes
             )
             task_ids = []
-            for question in exam.question_set.all():
-                task_id = async_task(
-                    evaluate_question_task,
-                    eval_stub.id,
-                    question.id,
-                    user_prompt,
-                    group=f"eval:{eval_stub.id}",
-                    timeout=EVALUATION_TASK_TIMEOUT,
+            try:
+                for question in exam.question_set.all():
+                    task_id = async_task(
+                        evaluate_question_task,
+                        eval_stub.id,
+                        question.id,
+                        user_prompt,
+                        group=f"eval:{eval_stub.id}",
+                        timeout=EVALUATION_TASK_TIMEOUT,
+                    )
+                    task_ids.append(task_id)
+            except Exception:
+                # If enqueue is interrupted, mark the stub as failed so it
+                # doesn't linger as "pending" forever.
+                from genaigrader.models import Evaluation
+
+                Evaluation.objects.filter(
+                    id=eval_stub.id, status__in=("pending", "running")
+                ).update(
+                    status="failed",
+                    failed_reason="Evaluation enqueue interrupted",
                 )
-                task_ids.append(task_id)
+                logger.exception(
+                    "Evaluation %s enqueue interrupted; marked failed",
+                    eval_stub.id,
+                )
+                raise
             return JsonResponse(
                 {
                     "status": "queued",

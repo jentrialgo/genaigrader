@@ -177,6 +177,7 @@ function pollEvaluations(evaluationIds, metaById, onProgress, onAllComplete) {
             $("#batch-eval-status-msg").html(
               '<div class="batch-eval-status-error">Stopped updating progress after ' + MAX_RETRIES + ' failed attempts. Reload the page to resume. Last progress: ' + lastFinished + '/' + lastTotal + '</div>'
             );
+            $("#batch-eval-form button[type=submit]").prop("disabled", false);
           }
           return null;
         }
@@ -237,6 +238,7 @@ function pollEvaluations(evaluationIds, metaById, onProgress, onAllComplete) {
           $("#batch-eval-status-msg").html(
             '<div class="batch-eval-status-error">Stopped updating progress after ' + MAX_RETRIES + ' failed attempts. Reload the page to resume. Last progress: ' + lastFinished + '/' + lastTotal + '</div>'
           );
+          $("#batch-eval-form button[type=submit]").prop("disabled", false);
         }
       });
   }, 3000);
@@ -289,6 +291,7 @@ function handleBatchEvalTask(response) {
           );
           $("#loading-indicator").hide();
           $("#progress-bar").css("width", "100%").text("Done");
+          $("#batch-eval-form button[type=submit]").prop("disabled", false);
         });
       } else {
         $("#loading-indicator").hide();
@@ -311,6 +314,7 @@ function handleBatchEvalTask(response) {
     } else {
       $("#loading-indicator").hide();
       $("#batch-eval-errors").html("Unexpected response from server.");
+      $("#batch-eval-form button[type=submit]").prop("disabled", false);
     }
   });
 }
@@ -325,6 +329,10 @@ $(document).ready(function () {
 
   $("#batch-eval-form").submit(function (event) {
     event.preventDefault(); // Prevent default form submission
+
+    // Prevent double submission
+    var $submitBtn = $("#batch-eval-form button[type=submit]");
+    $submitBtn.prop("disabled", true);
 
     // UI: Reset state
     $("#loading-indicator").show();
@@ -351,6 +359,7 @@ $(document).ready(function () {
       .catch((error) => {
         $("#loading-indicator").hide();
         $("#batch-eval-errors").html("Error: " + error.message);
+        $submitBtn.prop("disabled", false);
       });
   });
 });
@@ -395,8 +404,14 @@ function updateEvalCountIndicator() {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
-  updateEvalCountIndicator();
-  document.getElementById('exams').addEventListener('change', updateEvalCountIndicator);
-  document.getElementById('models').addEventListener('change', updateEvalCountIndicator);
-  document.getElementById('repetitions').addEventListener('input', updateEvalCountIndicator);
+  var examsEl = document.getElementById('exams');
+  var modelsEl = document.getElementById('models');
+  var repsEl = document.getElementById('repetitions');
+  if (examsEl && modelsEl && repsEl && document.getElementById('eval-count-indicator')) {
+    updateEvalCountIndicator();
+    examsEl.addEventListener('change', updateEvalCountIndicator);
+    modelsEl.addEventListener('change', updateEvalCountIndicator);
+    repsEl.addEventListener('input', updateEvalCountIndicator);
+  }
 });
+

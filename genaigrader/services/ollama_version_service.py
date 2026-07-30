@@ -39,7 +39,7 @@ def get_ollama_version():
             logger.warning("Connected to Ollama but could not determine version")
             return None
 
-    except (requests.ConnectionError, ollama.ResponseError) as e:
+    except Exception as e:
         logger.warning("Could not connect to ollama or determine version: %s", e)
 
     return None

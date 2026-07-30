@@ -290,12 +290,16 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 LOGIN_REDIRECT_URL = "home"  # Redirect here after logging in
 LOGOUT_REDIRECT_URL = "account_login"  # Redirect here after logging out
 
+# How long an Evaluation can stay in pending/running without any queued
+# tasks before the stale-evaluation reaper marks it as failed.
+STALE_EVALUATION_GRACE_MINUTES = int(os.getenv("STALE_EVALUATION_GRACE_MINUTES", "30"))
+
 Q_CLUSTER = {
     "name": "genaigrader",
     "workers": 1,
     "timeout": 7200,
     "retry": 7300,
-    "queue_limit": 50,
+    "queue_limit": 0,  # 0 = no limit (critical for large batch enqueues)
     "bulk": 10,
     "orm": "default",
     "ack_failures": True,

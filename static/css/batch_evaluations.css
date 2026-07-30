@@ -85,9 +85,15 @@
   transition: all 0.2s ease;
 }
 
-.batch-eval-btn:hover {
+.batch-eval-btn:hover:not(:disabled) {
   background: var(--secondary-color);
   transform: translateY(-2px);
+}
+
+.batch-eval-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
 }
 
 /* Tabla de Resultados - Versión Mejorada */
@@ -323,3 +329,4 @@ a .details-icon {
 .details-link {
   text-decoration: none;
 }
+

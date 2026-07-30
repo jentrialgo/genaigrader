@@ -147,17 +147,15 @@ class BatchEvaluationsViewTest(TestCase):
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertEqual(data["status"], "queued")
-        self.assertEqual(len(data["task_ids"]), 1)
+        self.assertEqual(data["task_ids"], [])
         self.assertEqual(data["total_tasks"], 1)
         self.assertEqual(len(data["evaluation_ids"]), 1)
 
         mock_async_task.assert_called_once()
         call_args = mock_async_task.call_args
-        from genaigrader.tasks import evaluate_question_task
+        from genaigrader.tasks import batch_orchestrator_task
 
-        self.assertEqual(call_args[0][0], evaluate_question_task)
-        self.assertEqual(call_args[1]["group"], f"eval:{data['evaluation_ids'][0]}")
-        self.assertEqual(call_args[1]["timeout"], 3600)
+        self.assertEqual(call_args[0][0], batch_orchestrator_task)
 
     @patch("genaigrader.services.ollama_version_service.get_ollama_version")
     @patch("genaigrader.views.batch_evaluations_view.async_task")
@@ -173,7 +171,7 @@ class BatchEvaluationsViewTest(TestCase):
         q2.correct_option = opt_b2
         q2.save()
 
-        mock_async_task.side_effect = [f"fake-task-id-{i}" for i in range(4)]
+        mock_async_task.return_value = "fake-task-id"
         mock_ollama_version.return_value = None
 
         response = self.client.post(
@@ -192,7 +190,7 @@ class BatchEvaluationsViewTest(TestCase):
 
         data = response.json()
         self.assertEqual(data["total_tasks"], 4)
-        self.assertEqual(len(data["task_ids"]), 4)
+        self.assertEqual(data["task_ids"], [])
         self.assertEqual(len(data["evaluation_ids"]), 4)
 
     def test_batch_evaluation_get_renders_template(self):
@@ -222,7 +220,7 @@ class BatchEvaluationsViewTest(TestCase):
 
         model2 = Model.objects.create(description="Test Model 2")
 
-        mock_async_task.side_effect = [f"fake-task-id-{i}" for i in range(4)]
+        mock_async_task.return_value = "fake-task-id"
         mock_ollama_version.return_value = None
 
         response = self.client.post(
@@ -242,6 +240,7 @@ class BatchEvaluationsViewTest(TestCase):
         data = response.json()
         self.assertEqual(data["total_tasks"], 4)
 
+        # Evaluations meta must be ordered by model → exam (stubs created in that order)
         model_ids_in_order = [meta["model_id"] for meta in data["evaluations"]]
         seen_models = []
         for mid in model_ids_in_order:
@@ -252,3 +251,39 @@ class BatchEvaluationsViewTest(TestCase):
             len(set(model_ids_in_order)),
             "Evaluations for the same model must be contiguous",
         )
+
+    @patch("genaigrader.services.ollama_version_service.get_ollama_version")
+    @patch("genaigrader.views.batch_evaluations_view.async_task")
+    def test_batch_enqueue_interrupt_marks_failed(
+        self, mock_async_task, mock_ollama_version
+    ):
+        """If orchestrator enqueue fails, created evaluations are marked failed."""
+        mock_ollama_version.return_value = None
+        # The view calls async_task once for the orchestrator; simulate failure
+        mock_async_task.side_effect = RuntimeError("boom")
+
+        self.client.raise_request_exception = False
+        response = self.client.post(
+            "/batch-evaluations/",
+            data=json.dumps(
+                {
+                    "exams[]": [str(self.exam.id)],
+                    "models[]": [str(self.model.id)],
+                    "repetitions": 2,
+                    "user_prompt": "",
+                    "notes": "",
+                }
+            ),
+            content_type="application/json",
+        )
+
+        # The exception should propagate as a 500
+        self.assertEqual(response.status_code, 500)
+
+        from genaigrader.models import Evaluation
+
+        evals = Evaluation.objects.filter(exam=self.exam)
+        self.assertEqual(evals.count(), 2)
+        for ev in evals:
+            self.assertEqual(ev.status, "failed")
+            self.assertIn("Orchestrator", ev.failed_reason)
