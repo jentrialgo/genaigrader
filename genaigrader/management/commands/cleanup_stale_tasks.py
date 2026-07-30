@@ -6,6 +6,7 @@ from django.utils import timezone
 from django_q.models import OrmQ, Task
 
 from genaigrader.models import Evaluation
+from genaigrader.services.stale_evaluation_service import reap_stale_evaluations
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +15,8 @@ EVALUATION_TASK_FUNC = "genaigrader.tasks.evaluate_question_task"
 
 class Command(BaseCommand):
     help = (
-        "Remove stale queued tasks (OrmQ) and delete Task records " "older than N days."
+        "Remove stale queued tasks (OrmQ), delete Task records older than N days, "
+        "and reap stale Evaluations stuck in pending/running."
     )
 
     def add_arguments(self, parser):
@@ -29,10 +31,16 @@ class Command(BaseCommand):
             action="store_true",
             help="Show what would be deleted without actually deleting.",
         )
+        parser.add_argument(
+            "--no-reap",
+            action="store_true",
+            help="Skip reaping stale Evaluations (only clean OrmQ and Task records).",
+        )
 
     def handle(self, **options):
         days = options["days"]
         dry_run = options["dry_run"]
+        no_reap = options["no_reap"]
 
         cutoff = timezone.now() - timedelta(days=days)
 
@@ -84,3 +92,16 @@ class Command(BaseCommand):
                 + (" (dry run)" if dry_run else "")
             )
         )
+
+        # ── Reap stale Evaluations ───────────────────────────────────────
+        if not no_reap:
+            if dry_run:
+                self.stdout.write("Skipping stale Evaluation reap in dry-run mode.")
+            else:
+                result = reap_stale_evaluations()
+                self.stdout.write(
+                    self.style.SUCCESS(
+                        f"Reaped {result['reaped']} stale Evaluation(s) "
+                        f"(grace={result['grace_minutes']} min)"
+                    )
+                )

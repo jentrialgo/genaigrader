@@ -241,6 +241,29 @@ class UploadFileTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(Exam.objects.filter(description="test.txt").count(), 2)
 
+    @patch("genaigrader.services.ollama_version_service.get_ollama_version")
+    @patch("genaigrader.services.upload_file_service.async_task")
+    def test_upload_file_enqueue_interrupt_marks_failed(
+        self, mock_async, mock_ollama_version
+    ):
+        """If async_task raises during enqueue, the evaluation is marked failed."""
+        mock_ollama_version.return_value = None
+        mock_async.side_effect = RuntimeError("broker is down")
+
+        request = self._mock_request(file_content=VALID_EXAM_FILE_CONTENT.encode())
+
+        response = upload_file(request)
+
+        # The exception propagates as a 500 from the generic except
+        self.assertEqual(response.status_code, 500)
+
+        from genaigrader.models import Evaluation
+
+        evals = Evaluation.objects.all()
+        self.assertEqual(evals.count(), 1)
+        self.assertEqual(evals.first().status, "failed")
+        self.assertIn("interrupted", evals.first().failed_reason)
+
 
 class TestExamService(TestCase):
     def test_invalid_exam_file_no_options(self):

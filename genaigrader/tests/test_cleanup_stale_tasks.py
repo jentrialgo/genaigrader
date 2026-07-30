@@ -141,3 +141,33 @@ class CleanupStaleTasksTest(TestCase):
         self.assertTrue(OrmQ.objects.filter(key="test-key-dry").exists())
         self.assertEqual(Task.objects.count(), 1)
         self.assertIn("dry run", output)
+
+    @patch("genaigrader.management.commands.cleanup_stale_tasks.reap_stale_evaluations")
+    def test_reap_called_by_default(self, mock_reap):
+        """The command should call reap_stale_evaluations unless --no-reap."""
+        mock_reap.return_value = {
+            "grace_minutes": 30,
+            "reaped": 2,
+            "reaped_ids": [1, 2],
+        }
+
+        output = self._call_command()
+
+        mock_reap.assert_called_once()
+        self.assertIn("Reaped 2 stale Evaluation(s)", output)
+
+    @patch("genaigrader.management.commands.cleanup_stale_tasks.reap_stale_evaluations")
+    def test_reap_skipped_with_no_reap(self, mock_reap):
+        """With --no-reap, stale evaluation reaping should be skipped."""
+        output = self._call_command(no_reap=True)
+
+        mock_reap.assert_not_called()
+        self.assertNotIn("Reaped", output)
+
+    @patch("genaigrader.management.commands.cleanup_stale_tasks.reap_stale_evaluations")
+    def test_reap_skipped_in_dry_run(self, mock_reap):
+        """With --dry-run, stale evaluation reaping should be skipped."""
+        output = self._call_command(dry_run=True)
+
+        mock_reap.assert_not_called()
+        self.assertIn("dry-run", output)

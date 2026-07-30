@@ -130,7 +130,7 @@ class LlmApi:
                     self.client = openai.OpenAI(
                         api_key=self.model_obj.api_key,
                         base_url=self.model_obj.api_url,
-                        timeout=300,
+                        timeout=3600,
                     )
                     # Perform a connectivity test request.
                     self.client.models.list()  # External API connectivity test.
@@ -270,7 +270,7 @@ class LlmApi:
         global _last_local_model_name
 
         if self.ollama_client is None:
-            self.ollama_client = ollama.Client(timeout=300)
+            self.ollama_client = ollama.Client(timeout=3600)
 
         current_model = self.model_obj.description
         if (
