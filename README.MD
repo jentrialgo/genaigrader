@@ -32,7 +32,7 @@ The development configuration is optimized for local iteration, featuring live c
     ```
 2.  **Start the Development Containers**:
     ```bash
-    docker compose -f Docker/docker-compose.dev.yml up --build
+    docker compose -p genaigrader --env-file .env -f Docker/docker-compose.dev.yml up --build
     ```
     * This service maps port 8000 on the host to port 8000 in the container.
     * Source code is mounted as a volume to allow real-time updates.
@@ -74,7 +74,7 @@ Before deploying to production, you **must** configure environment variables sec
 
 1.  **Initialize Production Stack with Environment Variables**:
     ```bash
-    docker compose --env-file .env -f Docker/docker-compose.prod.yml up --build
+    docker compose -p genaigrader --env-file .env -f Docker/docker-compose.prod.yml up --build -d
     ```
     * This environment deploys a PostgreSQL 15-alpine database container.
     * The database utilizes a persistent volume for data integrity.

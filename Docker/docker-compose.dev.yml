@@ -1,13 +1,34 @@
 services:
+  db:
+    image: postgres:15
+    environment:
+      - POSTGRES_DB=${DEV_POSTGRES_DB:?DEV_POSTGRES_DB is required}
+      - POSTGRES_USER=${DEV_POSTGRES_USER:?DEV_POSTGRES_USER is required}
+      - POSTGRES_PASSWORD=${DEV_POSTGRES_PASSWORD:?DEV_POSTGRES_PASSWORD is required}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DEV_POSTGRES_USER} -d ${DEV_POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+
   web:
     build:
       context: ..
       dockerfile: Dockerfile
     restart: unless-stopped
     depends_on:
-      - ollama
+      db:
+        condition: service_healthy
+      ollama:
+        condition: service_started
     environment:
+      - DATABASE_URL=postgres://${DEV_POSTGRES_USER}:${DEV_POSTGRES_PASSWORD}@db:5432/${DEV_POSTGRES_DB}
       - OLLAMA_HOST=http://ollama:11434
+      - GENAIGRADER_API_URL=http://host.docker.internal:8080
       - UV_LINK_MODE=copy
       - DJANGO_DEBUG=1
       - PYTHONUNBUFFERED=1
@@ -16,7 +37,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
-      - "8000:8000"
+      - "8080:8000"
     volumes:
       - ..:/app
       - /app/.venv
@@ -28,8 +49,12 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     depends_on:
-      - web
+      db:
+        condition: service_healthy
+      web:
+        condition: service_started
     environment:
+      - DATABASE_URL=postgres://${DEV_POSTGRES_USER}:${DEV_POSTGRES_PASSWORD}@db:5432/${DEV_POSTGRES_DB}
       - OLLAMA_HOST=http://ollama:11434
       - UV_LINK_MODE=copy
       - DJANGO_DEBUG=1
@@ -60,4 +85,5 @@ services:
     #           capabilities: [gpu]
 
 volumes:
+  postgres_dev_data:
   ollama_data:
