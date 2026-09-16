@@ -1,5 +1,5 @@
 from django.contrib.auth import get_user_model
-from django.test import Client, TestCase
+from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 
 User = get_user_model()
@@ -24,6 +24,33 @@ class ApiTokenViewTests(TestCase):
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, self.user.api_token)
+
+    def test_get_renders_api_url_when_authenticated(self):
+        self.client.login(username="tokenuser", password="password123")
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("api_url", response.context)
+        self.assertTrue(response.context["api_url"].endswith("/api/v1/"))
+        self.assertContains(response, response.context["api_url"])
+
+    @override_settings(GENAIGRADER_API_URL="http://localhost:8000")
+    def test_get_uses_env_api_url_when_setting_is_defined(self):
+        self.client.login(username="tokenuser", password="password123")
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["api_url"], "http://localhost:8000/api/v1/")
+
+    @override_settings(GENAIGRADER_API_URL="http://localhost:8000/")
+    def test_get_strips_trailing_slash_from_env_api_url(self):
+        self.client.login(username="tokenuser", password="password123")
+        response = self.client.get(self.url)
+        self.assertEqual(response.context["api_url"], "http://localhost:8000/api/v1/")
+
+    @override_settings(GENAIGRADER_API_URL=None)
+    def test_get_falls_back_to_request_url_when_setting_is_none(self):
+        self.client.login(username="tokenuser", password="password123")
+        response = self.client.get(self.url)
+        self.assertTrue(response.context["api_url"].endswith("/api/v1/"))
 
     def test_rotate_without_csrf_returns_403(self):
         csrf_client = Client(enforce_csrf_checks=True)

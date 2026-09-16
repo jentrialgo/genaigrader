@@ -141,6 +141,7 @@ elif _db_engine in {"postgres", "postgresql"}:
     }
 
 OLLAMA_API_URL = os.getenv("OLLAMA_HOST", "http://localhost:11434")
+GENAIGRADER_API_URL = os.getenv("GENAIGRADER_API_URL")
 
 
 # Password validation
